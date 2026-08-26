@@ -4,6 +4,7 @@ import { Layout } from './components/Layout';
 import { Produtos } from './pages/Produtos';
 import { Comandas } from './pages/Comandas';
 import { Dashboard } from './pages/Dashboard';
+import { Landing } from './pages/Landing';
 
 // Rota protegida básica
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
@@ -18,11 +19,12 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         
         {/* Rota Protegida com Layout */}
         <Route 
-          path="/" 
+          path="/app" 
           element={
             <ProtectedRoute>
               <Layout />

@@ -16,6 +16,10 @@ from app.api.routers.auth_router import router as auth_router
 from app.api.routers.tenant_router import router as tenant_router
 from app.api.routers.usuario_router import router as usuario_router
 from app.api.routers.financeiro_router import router as financeiro_router
+from app.api.routers.upload_router import router as upload_router
+from app.api.routers.webhook_router import router as webhook_router
+
+from fastapi.middleware.cors import CORSMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -39,6 +43,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Configuração de CORS (Permitir que o Frontend conecte na API)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Na produção, coloque a URL do Frontend aqui
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Registro dos middlewares de tratamento de erros
 app.add_exception_handler(BarixException, tratar_excecao_customizada) # type: ignore
 app.add_exception_handler(Exception, tratar_excecao_global)
@@ -50,6 +63,8 @@ app.include_router(usuario_router)
 app.include_router(produto_router)
 app.include_router(comanda_router)
 app.include_router(financeiro_router)
+app.include_router(upload_router)
+app.include_router(webhook_router)
 
 @app.get("/", tags=["Healthcheck"])
 async def root():

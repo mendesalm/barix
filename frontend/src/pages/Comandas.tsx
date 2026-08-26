@@ -114,10 +114,10 @@ export function Comandas() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-8rem)] lg:h-[calc(100vh-4rem)] gap-6 lg:gap-0">
       
       {/* Coluna Esquerda: Lista de Comandas */}
-      <div className="w-1/2 pr-6 flex flex-col border-r border-gray-200 h-full">
+      <div className="w-full lg:w-1/2 lg:pr-6 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-200 h-1/2 lg:h-full pb-6 lg:pb-0">
         <div className="flex justify-between items-center mb-6 shrink-0">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Comandas</h1>
@@ -128,7 +128,7 @@ export function Comandas() {
             className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium flex items-center space-x-2 hover:bg-blue-700 transition-colors shadow-sm"
           >
             <Plus size={20} />
-            <span>Abrir Conta</span>
+            <span className="hidden sm:inline">Abrir Conta</span>
           </button>
         </div>
 
@@ -169,7 +169,7 @@ export function Comandas() {
       </div>
 
       {/* Coluna Direita: Detalhes e PDV */}
-      <div className="w-1/2 pl-6 flex flex-col h-full bg-gray-50 rounded-xl p-6">
+      <div className="w-full lg:w-1/2 lg:pl-6 flex flex-col h-1/2 lg:h-full bg-gray-50 rounded-xl p-4 lg:p-6 shadow-inner lg:shadow-none">
         {comandaSelecionada ? (
           <div className="flex flex-col h-full">
             <div className="flex justify-between items-center mb-6 shrink-0 border-b border-gray-200 pb-4">

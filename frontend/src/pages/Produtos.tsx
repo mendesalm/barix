@@ -113,22 +113,23 @@ export function Produtos() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden w-full">
         {loading ? (
           <div className="p-8 text-center text-gray-500 animate-pulse">Carregando catálogo...</div>
         ) : (
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 text-sm">
-                <th className="px-6 py-4 font-semibold">Produto</th>
-                <th className="px-6 py-4 font-semibold">Categoria</th>
-                <th className="px-6 py-4 font-semibold">Custo</th>
-                <th className="px-6 py-4 font-semibold">Preço Venda</th>
-                <th className="px-6 py-4 font-semibold">Estoque</th>
-                <th className="px-6 py-4 font-semibold text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left border-collapse min-w-[800px]">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 text-sm">
+                  <th className="px-6 py-4 font-semibold">Produto</th>
+                  <th className="px-6 py-4 font-semibold">Categoria</th>
+                  <th className="px-6 py-4 font-semibold">Custo</th>
+                  <th className="px-6 py-4 font-semibold">Preço Venda</th>
+                  <th className="px-6 py-4 font-semibold">Estoque</th>
+                  <th className="px-6 py-4 font-semibold text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
               {produtos.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
@@ -181,6 +182,7 @@ export function Produtos() {
               )}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -213,8 +215,27 @@ export function Produtos() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">URL da Foto</label>
-                    <input type="url" value={fotoUrl} onChange={e=>setFotoUrl(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https://exemplo.com/foto.jpg" />
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Foto (Upload)</label>
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const formData = new FormData();
+                          formData.append('file', file);
+                          try {
+                            const res = await api.post('/uploads/produtos', formData, {
+                              headers: { 'Content-Type': 'multipart/form-data' }
+                            });
+                            setFotoUrl(`http://localhost:8000${res.data.url}`);
+                          } catch (err) {
+                            alert("Erro ao enviar foto");
+                          }
+                        }
+                      }} 
+                      className="w-full px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Data de Validade (Opcional)</label>
