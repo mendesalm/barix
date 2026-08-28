@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, ClipboardList, DollarSign, LogOut, Settings, Menu, X, Wine } from 'lucide-react';
+import { LayoutDashboard, Package, ClipboardList, DollarSign, LogOut, Settings, Menu, X, Wine, ShieldCheck } from 'lucide-react';
 
 export function Layout() {
   const navigate = useNavigate();
@@ -16,6 +16,7 @@ export function Layout() {
     { to: '/app/produtos', icon: <Package size={20} />, label: 'Produtos e Estoque' },
     { to: '/app/comandas', icon: <ClipboardList size={20} />, label: 'Comandas' },
     { to: '/app/financeiro', icon: <DollarSign size={20} />, label: 'Financeiro' },
+    { to: '/app/auditoria', icon: <ShieldCheck size={20} />, label: 'Auditoria' },
   ];
 
   return (

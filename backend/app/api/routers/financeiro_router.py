@@ -65,6 +65,43 @@ async def obter_resumo_financeiro(
         "ticket_medio": float(faturamento / total_comandas) if total_comandas > 0 else 0.0
     }
 
+@router.get("/auditoria")
+async def relatorio_auditoria_transacoes(
+    db: AsyncSession = Depends(obter_sessao),
+    usuario: Usuario = Depends(obter_usuario_logado)
+):
+    """
+    Lista a linha do tempo (Ledger) de todas as transações (PIX e Compras) 
+    do Estabelecimento para auditoria antifraude/câmera.
+    """
+    from app.models.cliente import TransacaoCarteira, CarteiraCliente, Cliente
+
+    # Busca as transações das carteiras vinculadas a este Tenant (Bar)
+    resultado = await db.execute(
+        select(TransacaoCarteira)
+        .join(CarteiraCliente)
+        .join(Cliente)
+        .where(CarteiraCliente.tenant_id == usuario.tenant_id)
+        .order_by(TransacaoCarteira.data_transacao.desc())
+        .limit(100) # Últimas 100 ações para performance
+    )
+    
+    transacoes = resultado.scalars().all()
+    
+    lista_auditoria = []
+    for t in transacoes:
+        lista_auditoria.append({
+            "id": t.id,
+            "data": t.data_transacao.isoformat(),
+            "cliente_nome": t.carteira.cliente.nome,
+            "cliente_cpf": t.carteira.cliente.cpf,
+            "tipo": t.tipo.value,
+            "valor": t.valor,
+            "descricao": t.descricao
+        })
+        
+    return lista_auditoria
+
 @router.get("/transacoes")
 async def listar_transacoes(
     db: AsyncSession = Depends(obter_sessao),

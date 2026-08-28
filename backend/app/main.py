@@ -18,6 +18,8 @@ from app.api.routers.usuario_router import router as usuario_router
 from app.api.routers.financeiro_router import router as financeiro_router
 from app.api.routers.upload_router import router as upload_router
 from app.api.routers.webhook_router import router as webhook_router
+from app.api.routers.kds_router import router as kds_router
+from app.api.routers.checkout_router import router as checkout_router
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -65,6 +67,8 @@ app.include_router(comanda_router)
 app.include_router(financeiro_router)
 app.include_router(upload_router)
 app.include_router(webhook_router)
+app.include_router(kds_router)
+app.include_router(checkout_router)
 
 @app.get("/", tags=["Healthcheck"])
 async def root():

@@ -5,6 +5,7 @@ import { Produtos } from './pages/Produtos';
 import { Comandas } from './pages/Comandas';
 import { Dashboard } from './pages/Dashboard';
 import { Landing } from './pages/Landing';
+import { Auditoria } from './pages/Auditoria';
 
 // Rota protegida básica
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
@@ -35,10 +36,9 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="produtos" element={<Produtos />} />
           <Route path="comandas" element={<Comandas />} />
+          <Route path="auditoria" element={<Auditoria />} />
         </Route>
       </Routes>
     </BrowserRouter>
   );
 }
-
-
