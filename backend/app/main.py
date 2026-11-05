@@ -6,7 +6,7 @@ from app.core.logger import configurar_logs, logger
 from app.core.database import engine, Base
 import app.models # Garante que os modelos sejam carregados
 from app.core.exceptions import (
-    BarixException, 
+    BipFyException, 
     tratar_excecao_customizada, 
     tratar_excecao_global
 )
@@ -20,6 +20,7 @@ from app.api.routers.upload_router import router as upload_router
 from app.api.routers.webhook_router import router as webhook_router
 from app.api.routers.kds_router import router as kds_router
 from app.api.routers.checkout_router import router as checkout_router
+from app.api.routers.cartao_router import router as cartao_router
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -33,10 +34,10 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
         logger.info("Tabelas do banco de dados sincronizadas.")
 
-    logger.info("API do Barix iniciada com sucesso.")
+    logger.info("API do BipFy iniciada com sucesso.")
     yield
     # Executado ao encerrar a aplicação
-    logger.info("API do Barix sendo desligada.")
+    logger.info("API do BipFy sendo desligada.")
 
 app = FastAPI(
     title=config.NOME_PROJETO,
@@ -45,17 +46,26 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configuração de CORS (Permitir que o Frontend conecte na API)
+# Configuração de CORS (Permitir que o Frontend Local, Mobile LAN e Produção conectem na API)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Na produção, coloque a URL do Frontend aqui
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8081", # Expo Web / Mobile
+        "http://69.62.89.211",
+        "https://69.62.89.211",
+    ],
+    allow_origin_regex=r"^https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Registro dos middlewares de tratamento de erros
-app.add_exception_handler(BarixException, tratar_excecao_customizada) # type: ignore
+app.add_exception_handler(BipFyException, tratar_excecao_customizada) # type: ignore
 app.add_exception_handler(Exception, tratar_excecao_global)
 
 # Registro das Rotas (Routers)
@@ -69,6 +79,7 @@ app.include_router(upload_router)
 app.include_router(webhook_router)
 app.include_router(kds_router)
 app.include_router(checkout_router)
+app.include_router(cartao_router)
 
 @app.get("/", tags=["Healthcheck"])
 async def root():
@@ -76,4 +87,4 @@ async def root():
     Rota básica para verificação de disponibilidade (Healthcheck).
     """
     logger.info("Requisição recebida na rota raiz.")
-    return {"mensagem": "Bem-vindo à API do Sistema de Gerenciamento de Bar (Barix)"}
+    return {"mensagem": "Bem-vindo à API do BipFy Sistema de Gerenciamento de Comércios"}

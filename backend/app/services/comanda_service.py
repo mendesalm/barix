@@ -14,21 +14,43 @@ class ComandaService:
         self.repo_produto = ProdutoRepository(db, tenant_id)
         self.tenant_id = tenant_id
 
-    def _calcular_total(self, comanda: Comanda) -> float:
-        return sum(item.quantidade * item.valor_unitario for item in comanda.itens)
+    def _enriquecer_comanda(self, comanda: Comanda) -> Comanda:
+        setattr(comanda, "total", sum(item.quantidade * item.valor_unitario for item in comanda.itens))
+        for item in comanda.itens:
+            if hasattr(item, "produto") and item.produto:
+                setattr(item, "produto_nome", item.produto.nome)
+            if hasattr(item, "status") and item.status:
+                setattr(item, "status", item.status.value if hasattr(item.status, "value") else str(item.status))
+        return comanda
 
     async def listar_comandas(self, status: Optional[StatusComanda] = None, skip: int = 0, limit: int = 100):
         comandas = await self.repo_comanda.listar_todas(status, skip, limit)
         for c in comandas:
-            setattr(c, "total", self._calcular_total(c))
+            self._enriquecer_comanda(c)
         return comandas
 
     async def obter_comanda(self, comanda_id: int):
         comanda = await self.repo_comanda.buscar_por_id(comanda_id)
         if not comanda:
             raise NaoEncontradoException(f"Comanda (ID: {comanda_id})")
-        setattr(comanda, "total", self._calcular_total(comanda))
-        return comanda
+        return self._enriquecer_comanda(comanda)
+
+    async def buscar_ou_abrir_por_cartao(self, identificador_cartao: str, nome_cliente: Optional[str] = None):
+        """
+        Localiza comanda aberta pelo Cartão/QR Code do cliente, ou abre uma nova
+        caso ele não possua uma comanda ativa no momento.
+        """
+        comanda = await self.repo_comanda.buscar_por_cartao(identificador_cartao)
+        if not comanda:
+            # Abre nova comanda vinculada ao cartão
+            dados = ComandaCreate(
+                identificador_cartao=identificador_cartao,
+                nome_cliente=nome_cliente or f"Cliente {identificador_cartao}"
+            )
+            comanda = await self.repo_comanda.criar(dados)
+            logger.info(f"Nova comanda #{comanda.id} criada para o cartão/QR {identificador_cartao}.")
+
+        return self._enriquecer_comanda(comanda)
 
     async def abrir_comanda(self, dados: ComandaCreate):
         if dados.identificador_cartao:
@@ -54,17 +76,13 @@ class ComandaService:
         if not produto.ativo:
             raise RegraNegocioException("Não é possível vender um produto inativo.")
 
-        # Validação do novo Estoque Avançado
-        estoque_atual = await self.repo_produto.obter_quantidade_estoque(produto.id)
-        if estoque_atual < dados.quantidade:
-            raise RegraNegocioException(f"Estoque insuficiente para {produto.nome}. Disponível: {estoque_atual}")
-
-        # Desconta o estoque registrando a SAIDA_VENDA
-        await self.repo_produto.registrar_movimentacao(
+        # Consome da Gôndola aplicando FEFO (Prioriza lotes com menor validade)
+        from app.services.produto_service import ProdutoService
+        produto_service = ProdutoService(self.repo_comanda.db, self.tenant_id)
+        await produto_service.consumir_gondola_fefo(
             produto_id=produto.id,
-            quantidade=-dados.quantidade,
-            tipo=TipoMovimentacao.SAIDA_VENDA,
-            motivo=f"Venda na comanda {comanda_id}"
+            quantidade=dados.quantidade,
+            motivo=f"Venda na comanda #{comanda_id}"
         )
 
         # Registra o item travando o preço de venda atual

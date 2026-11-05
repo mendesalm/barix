@@ -15,7 +15,7 @@ formato_log = (
 logger.add(sys.stdout, format=formato_log, level="INFO", colorize=True)
 
 # Adiciona um handler para salvar logs em arquivo, rotacionando a cada 10 MB
-logger.add("logs/barix_api.log", rotation="10 MB", retention="7 days", format=formato_log, level="INFO")
+logger.add("logs/bipfy_api.log", rotation="10 MB", retention="7 days", format=formato_log, level="INFO")
 
 def configurar_logs():
     """

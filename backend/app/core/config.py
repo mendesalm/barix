@@ -1,7 +1,8 @@
+from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Configuracoes(BaseSettings):
-    NOME_PROJETO: str = "Barix - Sistema de Gerenciamento de Bar"
+    NOME_PROJETO: str = "BipFy Sistema de Gerenciamento de Comércios"
     VERSAO: str = "1.0.0"
     DESCRICAO: str = "API para gestão de comandas, estoque e pagamentos."
     
@@ -12,7 +13,15 @@ class Configuracoes(BaseSettings):
     
     # Configurações do Banco de Dados
     # O padrão usa asyncpg para comunicação assíncrona
-    DATABASE_URL: str = "postgresql+asyncpg://barix_user:barix_password@localhost:5432/barix_dev"
+    DATABASE_URL: str = "postgresql+asyncpg://bipfy_user:bipfy_password@localhost:5432/bipfy_dev"
+
+    # Configurações de E-mail (SMTP)
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM: str = "BipFy SaaS <noreply@bipfy.com>"
+    SMTP_TLS: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 

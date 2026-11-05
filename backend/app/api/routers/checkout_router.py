@@ -18,8 +18,9 @@ from datetime import datetime
 router = APIRouter(prefix="/checkout", tags=["Self-Checkout / Honesty Market"])
 
 class SelfCheckoutPayload(BaseModel):
-    produto_id: int
-    quantidade: int
+    produto_id: Optional[int] = None
+    codigo: Optional[str] = None # Suporta bipagem direta do Código de Barras EAN ou Tag QR Code
+    quantidade: int = 1
 
 @router.post("/honesty-market")
 async def self_checkout(
@@ -38,14 +39,19 @@ async def self_checkout(
     if estabelecimento.modo_operacao == ModoOperacao.RESTRITO:
         raise HTTPException(status_code=403, detail="Esta unidade não autoriza compras diretas pelo celular.")
 
-    # 2. Resgata o Produto
-    resultado_prod = await db.execute(select(Produto).where(
-        Produto.id == payload.produto_id,
-        Produto.tenant_id == estabelecimento.id
-    ))
-    produto = resultado_prod.scalars().first()
+    # 2. Resgata o Produto por ID ou por Código de Barras / QR Code
+    from app.repositories.produto_repository import ProdutoRepository
+    repo_produto = ProdutoRepository(db, estabelecimento.id)
+    
+    if payload.codigo:
+        produto = await repo_produto.buscar_por_codigo(payload.codigo)
+    elif payload.produto_id:
+        produto = await repo_produto.buscar_por_id(payload.produto_id)
+    else:
+        raise HTTPException(status_code=400, detail="Informe produto_id ou codigo.")
+
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado.")
+        raise HTTPException(status_code=404, detail="Produto não encontrado no bar.")
 
     valor_total = produto.preco_venda * payload.quantidade
 
@@ -83,16 +89,14 @@ async def self_checkout(
         descricao=f"Self-Checkout: {payload.quantidade}x {produto.nome}"
     )
 
-    # 5. Dá baixa no Estoque
-    produto.quantidade_estoque -= payload.quantidade
-    baixa = MovimentacaoEstoque(
+    # 5. Dá baixa no Estoque da Gôndola aplicando FEFO (Prioriza lotes com menor validade)
+    from app.services.produto_service import ProdutoService
+    produto_service = ProdutoService(db, estabelecimento.id)
+    lotes_consumidos = await produto_service.consumir_gondola_fefo(
         produto_id=produto.id,
-        tenant_id=estabelecimento.id,
-        tipo=TipoMovimentacao.SAIDA_VENDA,
         quantidade=payload.quantidade,
-        observacao="Self-Checkout Mobile"
+        motivo="Self-Checkout Mobile"
     )
-    db.add(baixa)
 
     # 6. Registra na Comanda (Bypass no Bartender KDS)
     comanda = Comanda(
@@ -126,4 +130,30 @@ async def self_checkout(
             "valor_total": valor_total,
             "saldo_restante": carteira_atualizada.saldo
         }
+    }
+
+
+@router.get("/saldo")
+async def obter_meu_saldo(
+    usuario_atual: Usuario = Depends(obter_usuario_logado),
+    db: AsyncSession = Depends(obter_sessao)
+):
+    """
+    Retorna o saldo da carteira do cliente autenticado no estabelecimento atual.
+    """
+    resultado_cli = await db.execute(select(Cliente).where(Cliente.cpf == usuario_atual.email))
+    cliente = resultado_cli.scalars().first()
+    
+    if not cliente:
+        return {"saldo": 0.0, "cliente_nome": usuario_atual.nome}
+
+    resultado_cart = await db.execute(select(CarteiraCliente).where(
+        CarteiraCliente.cliente_id == cliente.id,
+        CarteiraCliente.tenant_id == usuario_atual.tenant_id
+    ))
+    carteira = resultado_cart.scalars().first()
+
+    return {
+        "saldo": float(carteira.saldo) if carteira else 0.0,
+        "cliente_nome": cliente.nome
     }

@@ -30,6 +30,25 @@ async def abrir_comanda(
     servico = ComandaService(db, usuario.tenant_id)
     return await servico.abrir_comanda(dados)
 
+from pydantic import BaseModel
+
+class IdentificarCartaoRequest(BaseModel):
+    identificador_cartao: str
+    nome_cliente: Optional[str] = None
+
+@router.post("/identificar-cartao", response_model=ComandaResponse)
+async def identificar_ou_abrir_por_cartao(
+    dados: IdentificarCartaoRequest,
+    db: AsyncSession = Depends(obter_sessao),
+    usuario: Usuario = Depends(obter_usuario_logado)
+):
+    """
+    (PDV Balcão) Operador bipa o Cartão/QR Code do cliente.
+    Localiza a comanda aberta dele ou cria uma comanda nova automaticamente.
+    """
+    servico = ComandaService(db, usuario.tenant_id)
+    return await servico.buscar_ou_abrir_por_cartao(dados.identificador_cartao, dados.nome_cliente)
+
 @router.get("/{comanda_id}", response_model=ComandaResponse)
 async def obter_comanda(
     comanda_id: int, 

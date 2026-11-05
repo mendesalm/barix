@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Wine, LogIn, KeyRound } from 'lucide-react';
 import { api } from '../services/api';
 import { Link, useNavigate } from 'react-router-dom';
@@ -10,7 +10,7 @@ export function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -25,7 +25,10 @@ export function Login() {
       });
       
       const token = response.data.access_token;
-      localStorage.setItem('barix_token', token);
+      localStorage.setItem('bipfy_token', token);
+      if (response.data.usuario) {
+        localStorage.setItem('bipfy_user', JSON.stringify(response.data.usuario));
+      }
       
       // Redireciona para o Painel logado
       navigate('/app');
@@ -43,7 +46,7 @@ export function Login() {
       <div className="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] bg-purple-600/20 rounded-full blur-[150px] pointer-events-none"></div>
 
       <Link to="/" className="absolute top-8 left-8 text-gray-400 hover:text-white transition-colors flex items-center gap-2">
-        <Wine className="w-5 h-5 text-blue-500" /> Barix
+        <Wine className="w-5 h-5 text-blue-500" /> BipFy
       </Link>
 
       <div className="w-full max-w-md relative z-10">
@@ -73,7 +76,7 @@ export function Login() {
                 type="email" 
                 required
                 className="w-full px-5 py-3.5 rounded-xl bg-black/40 border border-white/10 text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                placeholder="admin@barix.com"
+                placeholder="admin@bipfy.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
               />
@@ -108,7 +111,7 @@ export function Login() {
         </div>
         
         <p className="text-center text-gray-500 text-sm mt-8">
-          Powered by Barix Enterprise SaaS
+          Powered by BipFy Enterprise SaaS
         </p>
 
       </div>

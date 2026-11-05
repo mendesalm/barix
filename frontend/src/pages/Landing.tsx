@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { Wine, Smartphone, LayoutDashboard, LineChart, ShieldCheck, ChevronRight } from 'lucide-react';
 
@@ -15,7 +14,7 @@ export function Landing() {
           <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
             <Wine className="text-white w-6 h-6" />
           </div>
-          <span className="text-2xl font-bold tracking-tight text-white">Barix</span>
+          <span className="text-2xl font-bold tracking-tight text-white">BipFy</span>
         </div>
         <div className="flex gap-4">
           <Link 
@@ -44,14 +43,14 @@ export function Landing() {
         </div>
         
         <h1 className="text-6xl md:text-7xl font-extrabold tracking-tight mb-8 leading-tight">
-          Gestão de Bares <br/>
+          Gestão de Comércios <br/>
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
             em Tempo Real.
           </span>
         </h1>
         
         <p className="text-xl text-gray-400 mb-12 max-w-2xl mx-auto leading-relaxed">
-          Esqueça os sistemas antigos. O Barix é um SaaS Multitenant com PDV inteligente, controle de quebras via Event Sourcing e App Mobile nativo para garçons.
+          Esqueça os sistemas antigos. O BipFy Sistema de Gerenciamento de Comércios é um SaaS Multitenant com PDV inteligente, controle de estoque e validade (FEFO), e App Mobile para atendimento assistido e autoatendimento.
         </p>
 
         <div className="flex flex-col sm:flex-row justify-center gap-4">

@@ -13,7 +13,7 @@ class ComandaRepository:
         self.tenant_id = tenant_id
 
     async def listar_todas(self, status: Optional[StatusComanda] = None, skip: int = 0, limit: int = 100) -> List[Comanda]:
-        query = select(Comanda).options(selectinload(Comanda.itens)).where(Comanda.tenant_id == self.tenant_id)
+        query = select(Comanda).options(selectinload(Comanda.itens).selectinload(ItemComanda.produto)).where(Comanda.tenant_id == self.tenant_id)
         if status:
             query = query.where(Comanda.status == status)
         query = query.offset(skip).limit(limit)
@@ -23,14 +23,14 @@ class ComandaRepository:
 
     async def buscar_por_id(self, comanda_id: int) -> Optional[Comanda]:
         resultado = await self.db.execute(
-            select(Comanda).options(selectinload(Comanda.itens))
+            select(Comanda).options(selectinload(Comanda.itens).selectinload(ItemComanda.produto))
             .where(Comanda.id == comanda_id, Comanda.tenant_id == self.tenant_id)
         )
         return resultado.scalars().first()
         
     async def buscar_por_cartao(self, identificador_cartao: str) -> Optional[Comanda]:
         resultado = await self.db.execute(
-            select(Comanda).options(selectinload(Comanda.itens))
+            select(Comanda).options(selectinload(Comanda.itens).selectinload(ItemComanda.produto))
             .where(
                 Comanda.identificador_cartao == identificador_cartao, 
                 Comanda.status == StatusComanda.ABERTA,

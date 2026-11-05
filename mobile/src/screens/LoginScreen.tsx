@@ -29,7 +29,7 @@ export function LoginScreen({ navigation }: Props) {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       });
 
-      await AsyncStorage.setItem('barix_token', res.data.access_token);
+      await AsyncStorage.setItem('bipfy_token', res.data.access_token);
       navigation.replace('Wallet');
     } catch (err) {
       Alert.alert("Erro de Acesso", "Credenciais inválidas ou sem conexão.");
@@ -42,8 +42,8 @@ export function LoginScreen({ navigation }: Props) {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Wine color="#3b82f6" size={48} />
-        <Text style={styles.title}>Barix App</Text>
-        <Text style={styles.subtitle}>Sua carteira digital para bares</Text>
+        <Text style={styles.title}>BipFy App</Text>
+        <Text style={styles.subtitle}>BipFy Sistema de Gerenciamento de Comércios</Text>
       </View>
 
       <View style={styles.form}>

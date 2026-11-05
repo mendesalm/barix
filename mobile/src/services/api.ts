@@ -9,7 +9,7 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem('barix_token');
+  const token = (await AsyncStorage.getItem('bipfy_token')) || (await AsyncStorage.getItem('barix_token'));
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

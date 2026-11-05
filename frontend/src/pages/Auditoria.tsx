@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ShieldCheck, Activity, Search, Clock, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { api } from '../services/api';
 
 interface TransacaoAudit {
   id: number;
-  data: str;
-  cliente_nome: str;
-  cliente_cpf: str;
-  tipo: str;
+  data: string;
+  cliente_nome: string;
+  cliente_cpf: string;
+  tipo: string;
   valor: number;
-  descricao: str;
+  descricao: string;
 }
 
 export function Auditoria() {

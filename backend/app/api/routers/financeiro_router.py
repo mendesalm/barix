@@ -74,13 +74,16 @@ async def relatorio_auditoria_transacoes(
     Lista a linha do tempo (Ledger) de todas as transações (PIX e Compras) 
     do Estabelecimento para auditoria antifraude/câmera.
     """
-    from app.models.cliente import TransacaoCarteira, CarteiraCliente, Cliente
+    from app.models.cliente import TransacaoCarteira, CarteiraCliente
+    from sqlalchemy.orm import selectinload
 
-    # Busca as transações das carteiras vinculadas a este Tenant (Bar)
+    # Busca as transações das carteiras vinculadas a este Tenant (Bar) com carregamento ansioso
     resultado = await db.execute(
         select(TransacaoCarteira)
-        .join(CarteiraCliente)
-        .join(Cliente)
+        .options(
+            selectinload(TransacaoCarteira.carteira).selectinload(CarteiraCliente.cliente)
+        )
+        .join(CarteiraCliente, TransacaoCarteira.carteira_id == CarteiraCliente.id)
         .where(CarteiraCliente.tenant_id == usuario.tenant_id)
         .order_by(TransacaoCarteira.data_transacao.desc())
         .limit(100) # Últimas 100 ações para performance

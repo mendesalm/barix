@@ -1,20 +1,28 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, ClipboardList, DollarSign, LogOut, Settings, Menu, X, Wine, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Package, ClipboardList, DollarSign, LogOut, Settings, Menu, X, Wine, ShieldCheck, Building2 } from 'lucide-react';
 
 export function Layout() {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  const userRaw = localStorage.getItem('bipfy_user') || localStorage.getItem('barix_user');
+  const user = userRaw ? JSON.parse(userRaw) : null;
+  const isSuperAdmin = user?.cargo === 'SUPERADMIN';
+
   const handleLogout = () => {
+    localStorage.removeItem('bipfy_token');
+    localStorage.removeItem('bipfy_user');
     localStorage.removeItem('barix_token');
+    localStorage.removeItem('barix_user');
     navigate('/login');
   };
 
-  const menuItems = [
+  const baseMenuItems = [
     { to: '/app', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
     { to: '/app/produtos', icon: <Package size={20} />, label: 'Produtos e Estoque' },
     { to: '/app/comandas', icon: <ClipboardList size={20} />, label: 'Comandas' },
+    ...(isSuperAdmin ? [{ to: '/app/instancias', icon: <Building2 size={20} />, label: 'Instâncias (SaaS)' }] : []),
     { to: '/app/financeiro', icon: <DollarSign size={20} />, label: 'Financeiro' },
     { to: '/app/auditoria', icon: <ShieldCheck size={20} />, label: 'Auditoria' },
   ];
@@ -25,7 +33,7 @@ export function Layout() {
       {/* Mobile Topbar */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-50 flex items-center justify-between px-4 shadow-sm">
         <div className="flex items-center gap-2 text-blue-600 font-bold text-xl">
-          <Wine /> Barix
+          <Wine /> BipFy
         </div>
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-gray-600">
           {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -38,14 +46,19 @@ export function Layout() {
         transition-transform duration-300 ease-in-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-        <div className="h-16 flex items-center justify-center border-b border-gray-100 shrink-0 mt-16 lg:mt-0">
+        <div className="h-20 flex flex-col items-center justify-center border-b border-gray-100 shrink-0 mt-16 lg:mt-0 px-4">
           <h1 className="text-2xl font-bold text-blue-600 tracking-tight hidden lg:flex items-center gap-2">
-            <Wine /> Barix
+            <Wine /> BipFy
           </h1>
+          {user && (
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 ${isSuperAdmin ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+              {isSuperAdmin ? 'SuperAdmin (SaaS Global)' : `${user.cargo || 'Operador'} • Instância #${user.tenant_id}`}
+            </span>
+          )}
         </div>
 
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-          {menuItems.map((item) => (
+          {baseMenuItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

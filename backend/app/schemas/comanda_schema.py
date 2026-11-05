@@ -14,8 +14,10 @@ class ItemComandaCreate(ItemComandaBase):
 class ItemComandaResponse(ItemComandaBase):
     id: int
     comanda_id: int
+    produto_nome: Optional[str] = None
     valor_unitario: float
     data_pedido: datetime
+    status: Optional[str] = None
 
     class Config:
         from_attributes = True

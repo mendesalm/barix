@@ -2,21 +2,24 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from loguru import logger
 
-class BarixException(Exception):
+class BipFyException(Exception):
     """Classe base para as exceções customizadas do sistema."""
     def __init__(self, mensagem: str, status_code: int = 400):
         self.mensagem = mensagem
         self.status_code = status_code
 
-class NaoEncontradoException(BarixException):
+# Alias de compatibilidade
+BarixException = BipFyException
+
+class NaoEncontradoException(BipFyException):
     def __init__(self, recurso: str):
         super().__init__(f"{recurso} não encontrado.", status_code=404)
 
-class RegraNegocioException(BarixException):
+class RegraNegocioException(BipFyException):
     def __init__(self, mensagem: str):
         super().__init__(mensagem, status_code=400)
 
-async def tratar_excecao_customizada(request: Request, exc: BarixException):
+async def tratar_excecao_customizada(request: Request, exc: BipFyException):
     """Middleware que formata exceções de domínio do sistema."""
     logger.warning(f"Erro de negócio: {exc.mensagem} | Rota: {request.url.path}")
     return JSONResponse(

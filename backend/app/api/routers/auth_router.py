@@ -6,6 +6,7 @@ from sqlalchemy.future import select
 from app.core.database import obter_sessao
 from app.core.security import verificar_senha, criar_token_acesso
 from app.models.usuario import Usuario
+from app.api.dependencias import obter_usuario_logado
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
@@ -42,4 +43,26 @@ async def login(
         }
     )
     
-    return {"access_token": token, "token_type": "bearer"}
+    return {
+        "access_token": token, 
+        "token_type": "bearer",
+        "usuario": {
+            "id": usuario.id,
+            "nome": usuario.nome,
+            "email": usuario.email,
+            "cargo": usuario.cargo,
+            "tenant_id": usuario.tenant_id
+        }
+    }
+
+@router.get("/me")
+async def obter_meu_perfil(usuario: Usuario = Depends(obter_usuario_logado)):
+    """Retorna os dados do usuário autenticado e seu nível de acesso (SUPERADMIN, WEBMASTER, etc)."""
+    return {
+        "id": usuario.id,
+        "nome": usuario.nome,
+        "email": usuario.email,
+        "cargo": usuario.cargo,
+        "tenant_id": usuario.tenant_id,
+        "ativo": usuario.ativo
+    }

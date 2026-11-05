@@ -1,17 +1,56 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../services/api';
-import { Plus, Package, Edit, Trash2, AlertTriangle, X } from 'lucide-react';
+import { 
+  Plus, 
+  Package, 
+  AlertTriangle, 
+  X, 
+  ArrowRightLeft, 
+  Layers, 
+  ShieldAlert, 
+  Clock,
+  QrCode,
+  Printer,
+  Barcode,
+  Sparkles,
+  Loader2,
+  CheckCircle
+} from 'lucide-react';
+import QRCode from 'react-qr-code';
+
+interface LoteEstoque {
+  id: number;
+  numero_lote: string;
+  data_validade: string;
+  quantidade_gondola: number;
+  quantidade_armazem: number;
+  preco_custo_unitario: number;
+  dias_para_vencer: number;
+  status_validade: 'ok' | 'vencendo' | 'vencido';
+}
 
 interface Produto {
   id: number;
   nome: string;
   descricao?: string;
   foto_url?: string;
+  codigo_barras?: string;
+  qr_code_tag?: string;
   data_validade?: string;
   categoria: string;
+  subcategoria?: string;
+  tipo?: string;
+  marca?: string;
   preco_custo: number;
   preco_venda: number;
+  quantidade_gondola: number;
+  quantidade_armazem: number;
   quantidade_estoque: number;
+  estoque_minimo_gondola: number;
+  estoque_minimo_armazem: number;
+  alerta_reposicao_gondola: boolean;
+  alerta_compra_armazem: boolean;
+  lotes: LoteEstoque[];
   ativo: boolean;
 }
 
@@ -22,21 +61,97 @@ export function Produtos() {
   // Estados dos Modais
   const [isModalNovoOpen, setIsModalNovoOpen] = useState(false);
   const [isModalPerdaOpen, setIsModalPerdaOpen] = useState(false);
+  const [isModalTransferirOpen, setIsModalTransferirOpen] = useState(false);
+  const [isModalLotesOpen, setIsModalLotesOpen] = useState(false);
+  const [isModalNovoLoteOpen, setIsModalNovoLoteOpen] = useState(false);
+  const [isModalQrOpen, setIsModalQrOpen] = useState(false);
   const [produtoSelecionado, setProdutoSelecionado] = useState<Produto | null>(null);
 
   // Estados do Formulário de Novo Produto
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
   const [fotoUrl, setFotoUrl] = useState('');
-  const [dataValidade, setDataValidade] = useState('');
-  const [categoria, setCategoria] = useState('');
+  const [codigoBarras, setCodigoBarras] = useState('');
+  const [qrCodeTag, setQrCodeTag] = useState('');
+  const [categoria, setCategoria] = useState<'bebidas' | 'alimentos' | 'tabacos_conveniencia' | 'outros'>('bebidas');
+  const [subcategoria, setSubcategoria] = useState<'alcoolicas' | 'nao_alcoolicas' | 'snacks_petiscos' | 'refeicoes' | 'sobremesas' | 'outros'>('alcoolicas');
+  const [tipo, setTipo] = useState('cervejas');
+  const [marca, setMarca] = useState('');
   const [precoCusto, setPrecoCusto] = useState('');
   const [precoVenda, setPrecoVenda] = useState('');
-  const [estoqueInicial, setEstoqueInicial] = useState('');
+  const [estoqueInicialArmazem, setEstoqueInicialArmazem] = useState('0');
+  const [estoqueInicialGondola, setEstoqueInicialGondola] = useState('0');
+  const [minGondola, setMinGondola] = useState('5');
+  const [minArmazem, setMinArmazem] = useState('15');
+  const [numeroLoteInicial, setNumeroLoteInicial] = useState('LOTE-001');
+  const [validadeInicial, setValidadeInicial] = useState('');
+
+  // Estados do Formulário de Transferência
+  const [quantidadeTransferir, setQuantidadeTransferir] = useState('');
+  
+  // Estados do Formulário de Novo Lote
+  const [novoNumeroLote, setNovoNumeroLote] = useState('');
+  const [novaValidade, setNovaValidade] = useState('');
+  const [novaQtdLote, setNovaQtdLote] = useState('');
+  const [novoDestinoLote, setNovoDestinoLote] = useState<'armazem' | 'gondola'>('armazem');
 
   // Estados do Formulário de Perda/Quebra
   const [quantidadePerda, setQuantidadePerda] = useState('');
   const [motivoPerda, setMotivoPerda] = useState('');
+  const [localPerda, setLocalPerda] = useState<'gondola' | 'armazem'>('gondola');
+
+  // Estados de Inferência e Auto-Completar por EAN / GS1
+  const [buscandoEan, setBuscandoEan] = useState(false);
+  const [mensagemEan, setMensagemEan] = useState<{ tipo: 'sucesso' | 'info' | 'erro'; texto: string } | null>(null);
+
+  const consultarDadosEan = async (codigoParaConsultar?: string) => {
+    const cod = (codigoParaConsultar || codigoBarras || qrCodeTag).trim();
+    if (!cod) {
+      setMensagemEan({ tipo: 'info', texto: 'Informe ou bipe um Código de Barras ou QR Code primeiro.' });
+      return;
+    }
+
+    setBuscandoEan(true);
+    setMensagemEan(null);
+    try {
+      const response = await api.get(`/produtos/consultar-ean/${encodeURIComponent(cod)}`);
+      const dados = response.data;
+      if (dados.encontrado) {
+        if (dados.nome) setNome(dados.nome);
+        if (dados.marca) setMarca(dados.marca);
+        if (dados.categoria) setCategoria(dados.categoria);
+        if (dados.subcategoria) setSubcategoria(dados.subcategoria);
+        if (dados.tipo) setTipo(dados.tipo);
+        if (dados.foto_url) setFotoUrl(dados.foto_url);
+        if (dados.descricao && !descricao) setDescricao(dados.descricao);
+        if (dados.codigo_barras && !codigoBarras) setCodigoBarras(dados.codigo_barras);
+        if (dados.lote_sugerido) setNumeroLoteInicial(dados.lote_sugerido);
+        if (dados.data_validade_sugerida) setValidadeInicial(dados.data_validade_sugerida);
+        if (dados.preco_venda_sugerido && Number(dados.preco_venda_sugerido) > 0 && !precoVenda) {
+          setPrecoVenda(String(dados.preco_venda_sugerido));
+        }
+
+        const origemTexto = dados.origem === 'catalogo_barix' ? 'Catálogo Barix' : 'Open Food Facts (Base Aberta)';
+        setMensagemEan({
+          tipo: 'sucesso',
+          texto: `Produto identificado via ${origemTexto}: ${dados.nome}! Dados preenchidos automaticamente.`
+        });
+      } else {
+        setMensagemEan({
+          tipo: 'info',
+          texto: 'Código não localizado nas bases públicas. Você pode preencher os dados manualmente.'
+        });
+      }
+    } catch (err) {
+      console.error("Erro na consulta EAN:", err);
+      setMensagemEan({
+        tipo: 'erro',
+        texto: 'Não foi possível consultar a base externa no momento.'
+      });
+    } finally {
+      setBuscandoEan(false);
+    }
+  };
 
   useEffect(() => {
     carregarProdutos();
@@ -53,27 +168,38 @@ export function Produtos() {
     }
   };
 
-  const salvarNovoProduto = async (e: React.FormEvent) => {
+  const salvarNovoProduto = async (e: FormEvent) => {
     e.preventDefault();
     try {
       const payload: any = {
         nome,
         categoria,
+        subcategoria,
+        tipo,
+        marca,
         preco_custo: parseFloat(precoCusto),
         preco_venda: parseFloat(precoVenda),
-        estoque_inicial: parseInt(estoqueInicial) || 0,
+        estoque_inicial_armazem: parseInt(estoqueInicialArmazem) || 0,
+        estoque_inicial_gondola: parseInt(estoqueInicialGondola) || 0,
+        estoque_minimo_gondola: parseInt(minGondola) || 5,
+        estoque_minimo_armazem: parseInt(minArmazem) || 15,
+        numero_lote_inicial: numeroLoteInicial || "LOTE-001",
         ativo: true
       };
       
       if (descricao) payload.descricao = descricao;
       if (fotoUrl) payload.foto_url = fotoUrl;
-      if (dataValidade) payload.data_validade = new Date(dataValidade).toISOString();
+      if (codigoBarras) payload.codigo_barras = codigoBarras;
+      if (qrCodeTag) payload.qr_code_tag = qrCodeTag;
+      if (validadeInicial) payload.data_validade = new Date(validadeInicial).toISOString();
 
       await api.post('/produtos/', payload);
       setIsModalNovoOpen(false);
-      // Limpar form
-      setNome(''); setCategoria(''); setPrecoCusto(''); setPrecoVenda(''); setEstoqueInicial('');
-      setDescricao(''); setFotoUrl(''); setDataValidade('');
+      // Limpar formulário
+      setNome(''); setCategoria('bebidas'); setSubcategoria('alcoolicas'); setTipo('cervejas'); setMarca('');
+      setPrecoCusto(''); setPrecoVenda(''); setCodigoBarras(''); setQrCodeTag('');
+      setEstoqueInicialArmazem('0'); setEstoqueInicialGondola('0');
+      setDescricao(''); setFotoUrl(''); setValidadeInicial('');
       carregarProdutos();
     } catch (error) {
       alert("Erro ao salvar produto. Verifique os dados.");
@@ -81,13 +207,52 @@ export function Produtos() {
     }
   };
 
-  const registrarPerda = async (e: React.FormEvent) => {
+  const executarTransferenciaGondola = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!produtoSelecionado) return;
+    try {
+      await api.post(`/produtos/${produtoSelecionado.id}/transferir-gondola`, {
+        quantidade: parseInt(quantidadeTransferir)
+      });
+      setIsModalTransferirOpen(false);
+      setQuantidadeTransferir('');
+      setProdutoSelecionado(null);
+      carregarProdutos();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Erro ao transferir estoque.");
+    }
+  };
+
+  const salvarNovoLote = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!produtoSelecionado) return;
+    try {
+      await api.post(`/produtos/${produtoSelecionado.id}/lotes`, {
+        numero_lote: novoNumeroLote,
+        data_validade: new Date(novaValidade).toISOString(),
+        quantidade: parseInt(novaQtdLote),
+        destino: novoDestinoLote,
+        preco_custo_unitario: produtoSelecionado.preco_custo
+      });
+      setIsModalNovoLoteOpen(false);
+      setNovoNumeroLote(''); setNovaValidade(''); setNovaQtdLote('');
+      // Atualiza o produto selecionado nos lotes
+      const res = await api.get(`/produtos/${produtoSelecionado.id}`);
+      setProdutoSelecionado(res.data);
+      carregarProdutos();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Erro ao adicionar lote.");
+    }
+  };
+
+  const registrarPerda = async (e: FormEvent) => {
     e.preventDefault();
     if (!produtoSelecionado) return;
     try {
       await api.post(`/produtos/${produtoSelecionado.id}/perdas`, {
         quantidade: parseInt(quantidadePerda),
-        motivo: motivoPerda
+        motivo: motivoPerda,
+        local: localPerda
       });
       setIsModalPerdaOpen(false);
       setQuantidadePerda(''); setMotivoPerda(''); setProdutoSelecionado(null);
@@ -97,85 +262,203 @@ export function Produtos() {
     }
   };
 
+  // Contadores de Alertas para os Cards
+  const totalRepor = produtos.filter(p => p.alerta_reposicao_gondola).length;
+  const totalComprar = produtos.filter(p => p.alerta_compra_armazem).length;
+  const totalVencendo = produtos.flatMap(p => p.lotes).filter(l => l.status_validade === 'vencendo' || l.status_validade === 'vencido').length;
+
   return (
     <div className="space-y-6 relative">
-      <div className="flex justify-between items-center">
+      {/* Header Principal */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Produtos e Estoque</h1>
-          <p className="text-gray-500 mt-1">Gerencie seu catálogo e quantidades disponíveis.</p>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Estoque & Armazenagem</h1>
+          <p className="text-gray-500 mt-1 text-sm">
+            Gestão em 2 níveis (Armazém e Gôndola) com controle por lotes e despacho FEFO.
+          </p>
         </div>
         <button 
           onClick={() => setIsModalNovoOpen(true)}
-          className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium flex items-center space-x-2 hover:bg-blue-700 transition-colors shadow-sm"
+          className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-medium flex items-center space-x-2 hover:bg-blue-700 transition-colors shadow-sm"
         >
           <Plus size={20} />
-          <span>Novo Produto</span>
+          <span>Cadastrar Produto</span>
         </button>
       </div>
 
+      {/* Cards de Alertas de Giro e Validade */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700">
+            <ArrowRightLeft size={20} />
+          </div>
+          <div>
+            <div className="text-xl font-bold text-amber-900">{totalRepor}</div>
+            <div className="text-xs text-amber-700 font-medium">Itens precisando de Reposição na Gôndola</div>
+          </div>
+        </div>
+
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-rose-100 flex items-center justify-center text-rose-700">
+            <ShieldAlert size={20} />
+          </div>
+          <div>
+            <div className="text-xl font-bold text-rose-900">{totalComprar}</div>
+            <div className="text-xs text-rose-700 font-medium">Itens abaixo do Estoque Mínimo de Compra</div>
+          </div>
+        </div>
+
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-700">
+            <Clock size={20} />
+          </div>
+          <div>
+            <div className="text-xl font-bold text-indigo-900">{totalVencendo}</div>
+            <div className="text-xs text-indigo-700 font-medium">Lotes Próximos do Vencimento ou Vencidos</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabela de Produtos */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden w-full">
         {loading ? (
-          <div className="p-8 text-center text-gray-500 animate-pulse">Carregando catálogo...</div>
+          <div className="p-8 text-center text-gray-500 animate-pulse">Carregando catálogo e posições de estoque...</div>
         ) : (
           <div className="overflow-x-auto w-full">
-            <table className="w-full text-left border-collapse min-w-[800px]">
+            <table className="w-full text-left border-collapse min-w-[950px]">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 text-sm">
+                <tr className="bg-gray-50/80 border-b border-gray-200 text-gray-600 text-xs uppercase tracking-wider">
                   <th className="px-6 py-4 font-semibold">Produto</th>
                   <th className="px-6 py-4 font-semibold">Categoria</th>
-                  <th className="px-6 py-4 font-semibold">Custo</th>
-                  <th className="px-6 py-4 font-semibold">Preço Venda</th>
-                  <th className="px-6 py-4 font-semibold">Estoque</th>
+                  <th className="px-6 py-4 font-semibold">Preços (Custo / Venda)</th>
+                  <th className="px-6 py-4 font-semibold text-center">Gôndola (Geladeira)</th>
+                  <th className="px-6 py-4 font-semibold text-center">Armazém (Depósito)</th>
+                  <th className="px-6 py-4 font-semibold text-center">Lotes & FEFO</th>
                   <th className="px-6 py-4 font-semibold text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 text-sm">
               {produtos.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                     <div className="flex flex-col items-center justify-center">
                       <Package size={48} className="text-gray-300 mb-4" />
-                      <p className="text-lg font-medium">Nenhum produto cadastrado.</p>
+                      <p className="text-lg font-medium">Nenhum produto cadastrado no momento.</p>
                     </div>
                   </td>
                 </tr>
               ) : (
                 produtos.map((produto) => (
-                  <tr key={produto.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={produto.id} className="hover:bg-gray-50/60 transition-colors">
                     <td className="px-6 py-4 font-medium text-gray-800 flex items-center space-x-3">
                       {produto.foto_url ? (
-                        <img src={produto.foto_url} alt={produto.nome} className="w-10 h-10 rounded-full object-cover shadow-sm border border-gray-200" />
+                        <img src={produto.foto_url} alt={produto.nome} className="w-10 h-10 rounded-xl object-cover shadow-sm border border-gray-200" />
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 shadow-sm"><Package size={20}/></div>
+                        <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 border border-gray-200"><Package size={20}/></div>
                       )}
                       <div>
-                        <div>{produto.nome}</div>
+                        <div className="font-semibold text-gray-900">{produto.nome}</div>
                         {produto.descricao && <div className="text-xs text-gray-400 font-normal">{produto.descricao}</div>}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          {produto.qr_code_tag && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded text-[10px] font-mono" title={produto.qr_code_tag}>
+                              <QrCode size={11} /> QR Fábrica
+                            </span>
+                          )}
+                          {produto.codigo_barras && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] font-mono">
+                              <Barcode size={11} /> {produto.codigo_barras}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      <span className="px-2.5 py-1 bg-gray-100 rounded-full text-xs font-medium">{produto.categoria}</span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">R$ {produto.preco_custo.toFixed(2)}</td>
-                    <td className="px-6 py-4 font-medium text-blue-600">R$ {produto.preco_venda.toFixed(2)}</td>
+
                     <td className="px-6 py-4">
-                      <div className={`font-semibold ${produto.quantidade_estoque <= 0 ? 'text-red-500' : 'text-green-600'}`}>
-                        {produto.quantidade_estoque} un
+                      <div className="flex flex-col gap-1 items-start">
+                        <span className="px-2.5 py-0.5 bg-blue-50 text-blue-700 rounded-md text-xs font-semibold uppercase tracking-wider">
+                          {produto.categoria}
+                        </span>
+                        <div className="text-xs text-gray-600 font-medium">
+                          {produto.subcategoria || ''} {produto.tipo ? `• ${produto.tipo}` : ''}
+                        </div>
+                        {produto.marca && (
+                          <div className="text-[11px] text-gray-500 font-semibold">
+                            Marca: {produto.marca}
+                          </div>
+                        )}
                       </div>
-                      {produto.data_validade && (
-                        <div className="text-xs text-gray-400 mt-1">Val: {new Date(produto.data_validade).toLocaleDateString()}</div>
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <div className="text-xs text-gray-500">Custo: R$ {produto.preco_custo.toFixed(2)}</div>
+                      <div className="font-semibold text-blue-600">Venda: R$ {produto.preco_venda.toFixed(2)}</div>
+                    </td>
+
+                    {/* Coluna Gôndola */}
+                    <td className="px-6 py-4 text-center">
+                      <div className={`font-bold text-base ${produto.quantidade_gondola <= produto.estoque_minimo_gondola ? 'text-amber-600' : 'text-emerald-600'}`}>
+                        {produto.quantidade_gondola} un
+                      </div>
+                      <div className="text-[11px] text-gray-400">Min: {produto.estoque_minimo_gondola}</div>
+                      {produto.alerta_reposicao_gondola && (
+                        <span className="inline-block mt-1 px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-semibold rounded-full">
+                          Repor Urgente
+                        </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 flex justify-end space-x-4">
+
+                    {/* Coluna Armazém */}
+                    <td className="px-6 py-4 text-center">
+                      <div className={`font-bold text-base ${produto.quantidade_armazem <= produto.estoque_minimo_armazem ? 'text-rose-600' : 'text-gray-700'}`}>
+                        {produto.quantidade_armazem} un
+                      </div>
+                      <div className="text-[11px] text-gray-400">Min: {produto.estoque_minimo_armazem}</div>
+                      {produto.alerta_compra_armazem && (
+                        <span className="inline-block mt-1 px-2 py-0.5 bg-rose-100 text-rose-800 text-[10px] font-semibold rounded-full">
+                          Comprar
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Coluna Lotes */}
+                    <td className="px-6 py-4 text-center">
                       <button 
-                        title="Registrar Quebra/Perda"
-                        onClick={() => { setProdutoSelecionado(produto); setIsModalPerdaOpen(true); }}
-                        className="text-orange-500 hover:text-orange-700 flex items-center space-x-1 transition-colors"
+                        onClick={() => { setProdutoSelecionado(produto); setIsModalLotesOpen(true); }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-medium transition-colors"
                       >
-                        <AlertTriangle size={18} />
+                        <Layers size={14} />
+                        <span>{produto.lotes.length} {produto.lotes.length === 1 ? 'Lote' : 'Lotes'}</span>
                       </button>
-                      <button className="text-gray-400 hover:text-blue-500 transition-colors" title="Editar"><Edit size={18} /></button>
-                      <button className="text-gray-400 hover:text-red-500 transition-colors" title="Excluir"><Trash2 size={18} /></button>
+                    </td>
+
+                    {/* Ações */}
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {produto.quantidade_armazem > 0 && (
+                          <button
+                            title="Transferir para Gôndola (Reposição FEFO)"
+                            onClick={() => { setProdutoSelecionado(produto); setIsModalTransferirOpen(true); }}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <ArrowRightLeft size={18} />
+                          </button>
+                        )}
+                        <button
+                          title="Ver e Imprimir Etiqueta QR Code"
+                          onClick={() => { setProdutoSelecionado(produto); setIsModalQrOpen(true); }}
+                          className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        >
+                          <QrCode size={18} />
+                        </button>
+                        <button 
+                          title="Registrar Quebra/Avaria/Vencido"
+                          onClick={() => { setProdutoSelecionado(produto); setIsModalPerdaOpen(true); }}
+                          className="p-1.5 text-amber-500 hover:bg-amber-50 rounded-lg transition-colors"
+                        >
+                          <AlertTriangle size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -188,10 +471,10 @@ export function Produtos() {
 
       {/* Modal Novo Produto */}
       {isModalNovoOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex justify-between items-center p-6 border-b border-gray-100 shrink-0">
-              <h3 className="text-xl font-bold text-gray-800">Cadastrar Produto</h3>
+              <h3 className="text-xl font-bold text-gray-800">Cadastrar Produto & Estoque</h3>
               <button onClick={() => setIsModalNovoOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
             </div>
             
@@ -199,98 +482,559 @@ export function Produtos() {
               <form id="formNovoProduto" onSubmit={salvarNovoProduto} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Produto</label>
-                    <input type="text" required value={nome} onChange={e=>setNome(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ex: Cerveja Heineken 600ml" />
+                    <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Nome do Item</label>
+                    <input type="text" required value={nome} onChange={e=>setNome(e.target.value)} className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="Ex: Cerveja Stella Artois 330ml" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-                    <input type="text" required value={categoria} onChange={e=>setCategoria(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ex: Bebidas" />
+                    <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Marca</label>
+                    <input 
+                      type="text" 
+                      list="marcas-sugestoes"
+                      value={marca} 
+                      onChange={e=>setMarca(e.target.value)} 
+                      className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" 
+                      placeholder="Ex: Skol, Heineken, Amstel, Coca-Cola Zero" 
+                    />
+                    <datalist id="marcas-sugestoes">
+                      <option value="Skol" />
+                      <option value="Heineken" />
+                      <option value="Amstel" />
+                      <option value="Budweiser" />
+                      <option value="Corona" />
+                      <option value="Coca-Cola Zero" />
+                      <option value="Coca-Cola Original" />
+                      <option value="Fanta Laranja" />
+                      <option value="Sukita Uva" />
+                      <option value="Guaraná Antarctica" />
+                      <option value="Red Bull" />
+                      <option value="Monster" />
+                      <option value="Minalba" />
+                      <option value="Crystal" />
+                    </datalist>
                   </div>
                 </div>
 
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Categoria (Macro)</label>
+                    <select 
+                      value={categoria} 
+                      onChange={e=>setCategoria(e.target.value as any)} 
+                      className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"
+                    >
+                      <option value="bebidas">Bebidas</option>
+                      <option value="alimentos">Alimentos / Cozinha</option>
+                      <option value="tabacos_conveniencia">Tabacaria / Conveniência</option>
+                      <option value="outros">Outros</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Subcategoria</label>
+                    <select 
+                      value={subcategoria} 
+                      onChange={e=>setSubcategoria(e.target.value as any)} 
+                      className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"
+                    >
+                      <option value="alcoolicas">Alcoólicas</option>
+                      <option value="nao_alcoolicas">Não Alcoólicas</option>
+                      <option value="snacks_petiscos">Snacks & Petiscos</option>
+                      <option value="refeicoes">Refeições / Pratos</option>
+                      <option value="sobremesas">Sobremesas</option>
+                      <option value="outros">Outros</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Tipo de Produto</label>
+                    <input 
+                      type="text" 
+                      list="tipos-sugestoes"
+                      value={tipo} 
+                      onChange={e=>setTipo(e.target.value)} 
+                      className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" 
+                      placeholder="Ex: cervejas" 
+                    />
+                    <datalist id="tipos-sugestoes">
+                      <option value="cervejas" />
+                      <option value="aguas_minerais" />
+                      <option value="refrigerantes" />
+                      <option value="sucos" />
+                      <option value="energeticos" />
+                      <option value="vinhos" />
+                      <option value="destilados" />
+                      <option value="drinks_autorais" />
+                      <option value="snacks" />
+                    </datalist>
+                  </div>
+                </div>
+
+                {/* Identificação por QR Code de Fábrica e Código de Barras com Auto-Preenchimento */}
+                <div className="p-4 bg-gradient-to-r from-purple-50/70 to-blue-50/70 rounded-xl border border-purple-200/60 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-purple-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles size={16} className="text-purple-600" /> Identificação e Auto-Cadastro por Código
+                    </span>
+                    <button
+                      type="button"
+                      disabled={buscandoEan}
+                      onClick={() => consultarDadosEan()}
+                      className="px-3 py-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg flex items-center gap-1.5 shadow-xs transition-colors"
+                    >
+                      {buscandoEan ? (
+                        <>
+                          <Loader2 size={13} className="animate-spin" /> Buscando na base...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={13} /> Auto-Preencher Dados
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {mensagemEan && (
+                    <div className={`p-2.5 rounded-lg text-xs flex items-center gap-2 ${
+                      mensagemEan.tipo === 'sucesso' 
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                        : mensagemEan.tipo === 'erro'
+                        ? 'bg-red-50 text-red-800 border border-red-200'
+                        : 'bg-amber-50 text-amber-800 border border-amber-200'
+                    }`}>
+                      {mensagemEan.tipo === 'sucesso' && <CheckCircle size={15} className="text-emerald-600 shrink-0" />}
+                      <span>{mensagemEan.texto}</span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 uppercase mb-1 flex items-center gap-1.5">
+                        <QrCode size={14} className="text-purple-600" /> QR Code de Fábrica (GS1 Digital Link)
+                      </label>
+                      <input 
+                        type="text" 
+                        value={qrCodeTag} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          setQrCodeTag(val);
+                          // Auto-detecção de GTIN/EAN em QR Code GS1 Digital Link
+                          const match = val.match(/\/01\/(\d{13,14})/);
+                          if (match) {
+                            let gtin = match[1];
+                            if (gtin.length === 14 && gtin.startsWith('0')) gtin = gtin.substring(1);
+                            if (!codigoBarras) setCodigoBarras(gtin);
+                            consultarDadosEan(val);
+                          }
+                        }} 
+                        className="w-full px-3 py-2 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-sm bg-white font-mono text-xs" 
+                        placeholder="Bipe a URL/QR Code da embalagem..." 
+                      />
+                      <span className="text-[10px] text-purple-700 mt-1 block">
+                        Extrai GTIN, Lote e Validade instantaneamente de códigos GS1.
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 uppercase mb-1 flex items-center gap-1.5">
+                        <Barcode size={14} className="text-gray-500" /> Código de Barras (EAN-13 / GTIN)
+                      </label>
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          value={codigoBarras} 
+                          onChange={e => {
+                            const val = e.target.value;
+                            setCodigoBarras(val);
+                            // Se atingir 13 ou 14 dígitos (tamanho padrão de EAN), dispara busca automática
+                            if (/^\d{13,14}$/.test(val.trim())) {
+                              consultarDadosEan(val.trim());
+                            }
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              consultarDadosEan(codigoBarras);
+                            }
+                          }}
+                          className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white font-mono text-xs" 
+                          placeholder="Ex: 7894900011517 (ou bipe com o leitor)" 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => consultarDadosEan(codigoBarras)}
+                          disabled={buscandoEan || !codigoBarras}
+                          className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold shrink-0"
+                          title="Consultar código"
+                        >
+                          Buscar
+                        </button>
+                      </div>
+                      <span className="text-[10px] text-gray-500 mt-1 block">
+                        Bipe com a pistola de código de barras ou digite e pressione Enter.
+                      </span>
+                    </div>
+                  </div>
+
+                  {fotoUrl && (
+                    <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-purple-100">
+                      <img src={fotoUrl} alt="Prévia" className="w-12 h-12 object-contain rounded border border-gray-100" />
+                      <div className="text-xs">
+                        <p className="font-semibold text-gray-800">Foto oficial identificada</p>
+                        <p className="text-gray-500 text-[11px] truncate max-w-sm">{fotoUrl}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Descrição Breve</label>
-                  <input type="text" value={descricao} onChange={e=>setDescricao(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Opcional. Ex: Garrafa de vidro." />
+                  <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Descrição</label>
+                  <input type="text" value={descricao} onChange={e=>setDescricao(e.target.value)} className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="Opcional. Ex: Cerveja puro malte 350ml gelada" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Foto (Upload)</label>
-                    <input 
-                      type="file" 
-                      accept="image/*"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const formData = new FormData();
-                          formData.append('file', file);
-                          try {
-                            const res = await api.post('/uploads/produtos', formData, {
-                              headers: { 'Content-Type': 'multipart/form-data' }
-                            });
-                            setFotoUrl(`http://localhost:8000${res.data.url}`);
-                          } catch (err) {
-                            alert("Erro ao enviar foto");
-                          }
-                        }
-                      }} 
-                      className="w-full px-3 py-1.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
-                    />
+                    <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Preço de Custo (R$)</label>
+                    <input type="number" step="0.01" required value={precoCusto} onChange={e=>setPrecoCusto(e.target.value)} className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="5.50" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Data de Validade (Opcional)</label>
-                    <input type="date" value={dataValidade} onChange={e=>setDataValidade(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                    <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Preço de Venda (R$)</label>
+                    <input type="number" step="0.01" required value={precoVenda} onChange={e=>setPrecoVenda(e.target.value)} className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="12.00" />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Preço Custo (R$)</label>
-                    <input type="number" step="0.01" required value={precoCusto} onChange={e=>setPrecoCusto(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
+                  <span className="text-xs font-bold text-gray-700 uppercase tracking-wider block">Parâmetros de Estoque Mínimo</span>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Mínimo Gôndola (Geladeira)</label>
+                      <input type="number" required value={minGondola} onChange={e=>setMinGondola(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Mínimo Armazém (Depósito)</label>
+                      <input type="number" required value={minArmazem} onChange={e=>setMinArmazem(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Preço Venda (R$)</label>
-                    <input type="number" step="0.01" required value={precoVenda} onChange={e=>setPrecoVenda(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+
+                <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100 space-y-3">
+                  <span className="text-xs font-bold text-blue-900 uppercase tracking-wider block">Lote & Estoque Inicial</span>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Qtd no Armazém</label>
+                      <input type="number" required value={estoqueInicialArmazem} onChange={e=>setEstoqueInicialArmazem(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Qtd na Gôndola</label>
+                      <input type="number" required value={estoqueInicialGondola} onChange={e=>setEstoqueInicialGondola(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-sm" />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Estoque Inicial</label>
-                    <input type="number" required value={estoqueInicial} onChange={e=>setEstoqueInicial(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Identificador do Lote</label>
+                      <input type="text" value={numeroLoteInicial} onChange={e=>setNumeroLoteInicial(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Data de Validade</label>
+                      <input type="date" value={validadeInicial} onChange={e=>setValidadeInicial(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-sm" />
+                    </div>
                   </div>
                 </div>
               </form>
             </div>
             
             <div className="p-6 border-t border-gray-100 flex justify-end space-x-3 shrink-0">
-              <button type="button" onClick={() => setIsModalNovoOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium">Cancelar</button>
-              <button type="submit" form="formNovoProduto" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-sm">Salvar Produto</button>
+              <button type="button" onClick={() => setIsModalNovoOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl font-medium text-sm">Cancelar</button>
+              <button type="submit" form="formNovoProduto" className="px-5 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium text-sm shadow-sm">Salvar Produto</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Transferir do Armazém para a Gôndola */}
+      {isModalTransferirOpen && produtoSelecionado && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-gray-100 bg-blue-50 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-blue-900 flex items-center gap-2">
+                <ArrowRightLeft size={20} /> Repor Gôndola (FEFO)
+              </h3>
+              <button onClick={() => setIsModalTransferirOpen(false)} className="text-blue-400 hover:text-blue-600"><X size={20} /></button>
+            </div>
+            <form onSubmit={executarTransferenciaGondola} className="p-6 space-y-4">
+              <p className="text-sm text-gray-600">
+                Item: <span className="font-bold text-gray-900">{produtoSelecionado.nome}</span>
+              </p>
+              <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 text-xs text-blue-800">
+                Disponível no Armazém: <strong>{produtoSelecionado.quantidade_armazem} un</strong>.
+                O sistema aplicará o algoritmo <strong>FEFO</strong> automaticamente, priorizando os lotes que vencem primeiro.
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Quantidade a Transferir</label>
+                <input 
+                  type="number" 
+                  min="1" 
+                  max={produtoSelecionado.quantidade_armazem} 
+                  required 
+                  value={quantidadeTransferir} 
+                  onChange={e => setQuantidadeTransferir(e.target.value)}
+                  className="w-full px-4 py-2.5 border rounded-xl text-base focus:ring-2 focus:ring-blue-500 outline-none" 
+                  placeholder={`Máx: ${produtoSelecionado.quantidade_armazem}`}
+                />
+              </div>
+              <div className="pt-2 flex justify-end gap-2">
+                <button type="button" onClick={() => setIsModalTransferirOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl text-sm font-medium">Cancelar</button>
+                <button type="submit" className="px-5 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-sm font-semibold shadow-sm">Confirmar Transferência</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Visualizar / Gerenciar Lotes */}
+      {isModalLotesOpen && produtoSelecionado && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Layers size={22} className="text-indigo-600" /> Lotes & Validade (FEFO)
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">{produtoSelecionado.nome}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setIsModalNovoLoteOpen(true)}
+                  className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-medium flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus size={16} /> Nova Entrada de Lote
+                </button>
+                <button onClick={() => setIsModalLotesOpen(false)} className="text-gray-400 hover:text-gray-600 p-1"><X size={22} /></button>
+              </div>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 text-xs uppercase">
+                    <th className="px-4 py-3 font-semibold">Lote</th>
+                    <th className="px-4 py-3 font-semibold">Validade</th>
+                    <th className="px-4 py-3 font-semibold text-center">Gôndola</th>
+                    <th className="px-4 py-3 font-semibold text-center">Armazém</th>
+                    <th className="px-4 py-3 font-semibold text-center">Status FEFO</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {produtoSelecionado.lotes.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-gray-400">Nenhum lote ativo.</td>
+                    </tr>
+                  ) : (
+                    produtoSelecionado.lotes.map((lote) => (
+                      <tr key={lote.id} className="hover:bg-gray-50/50">
+                        <td className="px-4 py-3.5 font-bold text-gray-800">{lote.numero_lote}</td>
+                        <td className="px-4 py-3.5">
+                          <div>{new Date(lote.data_validade).toLocaleDateString()}</div>
+                          <div className="text-[11px] text-gray-400">{lote.dias_para_vencer} dias restantes</div>
+                        </td>
+                        <td className="px-4 py-3.5 text-center font-semibold text-emerald-600">{lote.quantidade_gondola} un</td>
+                        <td className="px-4 py-3.5 text-center font-semibold text-gray-700">{lote.quantidade_armazem} un</td>
+                        <td className="px-4 py-3.5 text-center">
+                          {lote.status_validade === 'vencido' && (
+                            <span className="px-2.5 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full">Vencido</span>
+                          )}
+                          {lote.status_validade === 'vencendo' && (
+                            <span className="px-2.5 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded-full">Vencendo</span>
+                          )}
+                          {lote.status_validade === 'ok' && (
+                            <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-xs font-medium rounded-full">Válido</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Entrada de Novo Lote */}
+      {isModalNovoLoteOpen && produtoSelecionado && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-indigo-50">
+              <h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                <Plus size={20} /> Nova Entrada de Lote
+              </h3>
+              <button onClick={() => setIsModalNovoLoteOpen(false)} className="text-indigo-400 hover:text-indigo-600"><X size={20} /></button>
+            </div>
+            <form onSubmit={salvarNovoLote} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Número do Lote</label>
+                <input 
+                  type="text" 
+                  required 
+                  value={novoNumeroLote} 
+                  onChange={e => setNovoNumeroLote(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500" 
+                  placeholder="Ex: LOTE-2026-X8"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Data de Validade</label>
+                <input 
+                  type="date" 
+                  required 
+                  value={novaValidade} 
+                  onChange={e => setNovaValidade(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500" 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Quantidade</label>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    required 
+                    value={novaQtdLote} 
+                    onChange={e => setNovaQtdLote(e.target.value)}
+                    className="w-full px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500" 
+                    placeholder="24"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Destino Inicial</label>
+                  <select 
+                    value={novoDestinoLote} 
+                    onChange={e => setNovoDestinoLote(e.target.value as any)}
+                    className="w-full px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                  >
+                    <option value="armazem">Armazém (Depósito)</option>
+                    <option value="gondola">Gôndola (Geladeira)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button type="button" onClick={() => setIsModalNovoLoteOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl text-sm font-medium">Cancelar</button>
+                <button type="submit" className="px-5 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm font-semibold shadow-sm">Registrar Entrada</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
       {/* Modal Registrar Perda/Quebra */}
       {isModalPerdaOpen && produtoSelecionado && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
             <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-orange-50">
-              <h3 className="text-xl font-bold text-orange-800 flex items-center gap-2"><AlertTriangle size={20}/> Registrar Quebra</h3>
+              <h3 className="text-xl font-bold text-orange-800 flex items-center gap-2"><AlertTriangle size={20}/> Registrar Perda</h3>
               <button onClick={() => setIsModalPerdaOpen(false)} className="text-orange-400 hover:text-orange-600"><X size={24} /></button>
             </div>
             <form onSubmit={registrarPerda} className="p-6 space-y-4">
               <p className="text-sm text-gray-600">Produto: <span className="font-bold text-gray-800">{produtoSelecionado.nome}</span></p>
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade Perdida</label>
-                <input type="number" min="1" max={produtoSelecionado.quantidade_estoque} required value={quantidadePerda} onChange={e=>setQuantidadePerda(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Ex: 1" />
+                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Local da Ocorrência</label>
+                <select 
+                  value={localPerda} 
+                  onChange={e => setLocalPerda(e.target.value as any)}
+                  className="w-full px-3 py-2 border rounded-xl text-sm bg-white"
+                >
+                  <option value="gondola">Gôndola (Geladeira / Salão)</option>
+                  <option value="armazem">Armazém (Depósito)</option>
+                </select>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Motivo / Justificativa</label>
-                <textarea required value={motivoPerda} onChange={e=>setMotivoPerda(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Ex: Garrafa caiu e quebrou no salão" rows={3}></textarea>
+                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Quantidade</label>
+                <input 
+                  type="number" 
+                  min="1" 
+                  required 
+                  value={quantidadePerda} 
+                  onChange={e=>setQuantidadePerda(e.target.value)} 
+                  className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-sm" 
+                  placeholder="Ex: 1" 
+                />
               </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Motivo</label>
+                <textarea 
+                  required 
+                  value={motivoPerda} 
+                  onChange={e=>setMotivoPerda(e.target.value)} 
+                  className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-sm" 
+                  placeholder="Ex: Garrafa caiu, ou produto vencido descartado" 
+                  rows={3}
+                ></textarea>
+              </div>
+
               <div className="mt-6 flex justify-end space-x-3">
-                <button type="button" onClick={() => setIsModalPerdaOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium">Debitar Estoque</button>
+                <button type="button" onClick={() => setIsModalPerdaOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl font-medium text-sm">Cancelar</button>
+                <button type="submit" className="px-5 py-2 bg-orange-500 text-white rounded-xl hover:bg-orange-600 font-medium text-sm">Registrar Baixa</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Visualizar e Imprimir Etiqueta QR Code BipFy */}
+      {isModalQrOpen && produtoSelecionado && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col items-center p-6 text-center">
+            <div className="w-full flex justify-between items-center mb-4">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Etiqueta Oficial BipFy</span>
+              <button onClick={() => setIsModalQrOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+            </div>
+
+            {/* Cartão de Etiqueta Imprimível */}
+            <div id="etiqueta-print" className="p-6 bg-white border-2 border-dashed border-gray-300 rounded-2xl w-full flex flex-col items-center">
+              <h4 className="font-extrabold text-gray-900 text-lg leading-tight mb-1">{produtoSelecionado.nome}</h4>
+              <p className="text-xs text-gray-500 mb-4">{produtoSelecionado.categoria}</p>
+
+              <div className="p-3 bg-white border border-gray-100 rounded-xl shadow-sm mb-4">
+                <QRCode 
+                  value={produtoSelecionado.qr_code_tag || `BIPFY-P${produtoSelecionado.id}`} 
+                  size={150} 
+                  style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                  viewBox="0 0 256 256"
+                />
+              </div>
+
+              <div className="text-2xl font-black text-blue-600 mb-1">
+                R$ {produtoSelecionado.preco_venda.toFixed(2)}
+              </div>
+              <div className="text-[11px] font-mono text-gray-400">
+                TAG: {produtoSelecionado.qr_code_tag || `BIPFY-P${produtoSelecionado.id}`}
+              </div>
+              {produtoSelecionado.codigo_barras && (
+                <div className="text-[11px] font-mono text-gray-400 mt-0.5">
+                  EAN: {produtoSelecionado.codigo_barras}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex w-full gap-2">
+              <button 
+                type="button" 
+                onClick={() => setIsModalQrOpen(false)} 
+                className="flex-1 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl text-sm font-medium"
+              >
+                Fechar
+              </button>
+              <button 
+                type="button" 
+                onClick={() => window.print()} 
+                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 shadow-sm"
+              >
+                <Printer size={16} /> Imprimir
+              </button>
+            </div>
           </div>
         </div>
       )}

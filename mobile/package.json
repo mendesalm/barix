@@ -1,5 +1,5 @@
 {
-  "name": "mobile",
+  "name": "bipfy-mobile",
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
@@ -13,6 +13,7 @@
     "lucide-react-native": "^1.35.0",
     "react": "19.2.3",
     "react-native": "0.86.2",
+    "react-native-qrcode-svg": "^6.3.52",
     "react-native-safe-area-context": "^5.9.1",
     "react-native-screens": "^4.27.0",
     "react-native-svg": "^15.15.5"
