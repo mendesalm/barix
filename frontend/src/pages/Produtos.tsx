@@ -14,9 +14,11 @@ import {
   Barcode,
   Sparkles,
   Loader2,
-  CheckCircle
+  CheckCircle,
+  Camera
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
+import { LeitorQrCameraModal } from '../components/LeitorQrCameraModal';
 
 interface LoteEstoque {
   id: number;
@@ -66,6 +68,50 @@ export function Produtos() {
   const [isModalNovoLoteOpen, setIsModalNovoLoteOpen] = useState(false);
   const [isModalQrOpen, setIsModalQrOpen] = useState(false);
   const [produtoSelecionado, setProdutoSelecionado] = useState<Produto | null>(null);
+
+  // Estado do Leitor de Câmera
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraOrigem, setCameraOrigem] = useState<'geral' | 'qr' | 'barra'>('geral');
+
+  const aoEscanearCodigoNaCamera = (codigo: string) => {
+    setIsCameraOpen(false);
+    const cod = codigo.trim();
+    if (!cod) return;
+
+    // Se estiver lendo direto de um campo específico no modal aberto:
+    if (cameraOrigem === 'qr') {
+      setQrCodeTag(cod);
+      const match = cod.match(/\/01\/(\d{13,14})/);
+      if (match) {
+        let gtin = match[1];
+        if (gtin.length === 14 && gtin.startsWith('0')) gtin = gtin.substring(1);
+        if (!codigoBarras) setCodigoBarras(gtin);
+      }
+      consultarDadosEan(cod);
+      return;
+    }
+
+    if (cameraOrigem === 'barra') {
+      setCodigoBarras(cod);
+      consultarDadosEan(cod);
+      return;
+    }
+
+    // Leitura Geral (botão do Header): abre o modal de cadastro e auto-preenche
+    setIsModalNovoOpen(true);
+    if (cod.includes('/01/') || cod.startsWith('http')) {
+      setQrCodeTag(cod);
+      const match = cod.match(/\/01\/(\d{13,14})/);
+      if (match) {
+        let gtin = match[1];
+        if (gtin.length === 14 && gtin.startsWith('0')) gtin = gtin.substring(1);
+        setCodigoBarras(gtin);
+      }
+    } else {
+      setCodigoBarras(cod);
+    }
+    consultarDadosEan(cod);
+  };
 
   // Estados do Formulário de Novo Produto
   const [nome, setNome] = useState('');
@@ -277,13 +323,29 @@ export function Produtos() {
             Gestão em 2 níveis (Armazém e Gôndola) com controle por lotes e despacho FEFO.
           </p>
         </div>
-        <button 
-          onClick={() => setIsModalNovoOpen(true)}
-          className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-medium flex items-center space-x-2 hover:bg-blue-700 transition-colors shadow-sm"
-        >
-          <Plus size={20} />
-          <span>Cadastrar Produto</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button 
+            type="button"
+            onClick={() => {
+              setCameraOrigem('geral');
+              setIsCameraOpen(true);
+            }}
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-5 py-2.5 rounded-xl font-medium flex items-center space-x-2 hover:from-purple-700 hover:to-indigo-700 transition-all shadow-sm hover:shadow"
+            title="Abre a câmera para ler o QR Code da lata ou código de barras e preencher o cadastro automaticamente"
+          >
+            <Camera size={18} />
+            <span>Escanear para Cadastrar</span>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => setIsModalNovoOpen(true)}
+            className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-medium flex items-center space-x-2 hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <Plus size={20} />
+            <span>Cadastrar Manual</span>
+          </button>
+        </div>
       </div>
 
       {/* Cards de Alertas de Giro e Validade */}
@@ -609,24 +671,38 @@ export function Produtos() {
                       <label className="block text-xs font-semibold text-gray-700 uppercase mb-1 flex items-center gap-1.5">
                         <QrCode size={14} className="text-purple-600" /> QR Code de Fábrica (GS1 Digital Link)
                       </label>
-                      <input 
-                        type="text" 
-                        value={qrCodeTag} 
-                        onChange={e => {
-                          const val = e.target.value;
-                          setQrCodeTag(val);
-                          // Auto-detecção de GTIN/EAN em QR Code GS1 Digital Link
-                          const match = val.match(/\/01\/(\d{13,14})/);
-                          if (match) {
-                            let gtin = match[1];
-                            if (gtin.length === 14 && gtin.startsWith('0')) gtin = gtin.substring(1);
-                            if (!codigoBarras) setCodigoBarras(gtin);
-                            consultarDadosEan(val);
-                          }
-                        }} 
-                        className="w-full px-3 py-2 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-sm bg-white font-mono text-xs" 
-                        placeholder="Bipe a URL/QR Code da embalagem..." 
-                      />
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          value={qrCodeTag} 
+                          onChange={e => {
+                            const val = e.target.value;
+                            setQrCodeTag(val);
+                            // Auto-detecção de GTIN/EAN em QR Code GS1 Digital Link
+                            const match = val.match(/\/01\/(\d{13,14})/);
+                            if (match) {
+                              let gtin = match[1];
+                              if (gtin.length === 14 && gtin.startsWith('0')) gtin = gtin.substring(1);
+                              if (!codigoBarras) setCodigoBarras(gtin);
+                              consultarDadosEan(val);
+                            }
+                          }} 
+                          className="w-full px-3 py-2 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-sm bg-white font-mono text-xs" 
+                          placeholder="Bipe a URL/QR Code da embalagem..." 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCameraOrigem('qr');
+                            setIsCameraOpen(true);
+                          }}
+                          className="px-3 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-xl text-xs font-semibold flex items-center gap-1 shrink-0"
+                          title="Escanear com a câmera"
+                        >
+                          <Camera size={14} />
+                          <span>Ler</span>
+                        </button>
+                      </div>
                       <span className="text-[10px] text-purple-700 mt-1 block">
                         Extrai GTIN, Lote e Validade instantaneamente de códigos GS1.
                       </span>
@@ -657,6 +733,18 @@ export function Produtos() {
                           className="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white font-mono text-xs" 
                           placeholder="Ex: 7894900011517 (ou bipe com o leitor)" 
                         />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCameraOrigem('barra');
+                            setIsCameraOpen(true);
+                          }}
+                          className="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-xl text-xs font-semibold flex items-center gap-1 shrink-0"
+                          title="Escanear com a câmera"
+                        >
+                          <Camera size={14} />
+                          <span>Ler</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => consultarDadosEan(codigoBarras)}
@@ -1038,6 +1126,21 @@ export function Produtos() {
           </div>
         </div>
       )}
+
+      {/* Modal Leitor de Câmera para QR Code e Código de Barras */}
+      <LeitorQrCameraModal
+        aberto={isCameraOpen}
+        aoFechar={() => setIsCameraOpen(false)}
+        aoLerCodigo={aoEscanearCodigoNaCamera}
+        titulo={
+          cameraOrigem === 'qr'
+            ? 'Escanear QR Code de Fábrica (GS1)'
+            : cameraOrigem === 'barra'
+            ? 'Escanear Código de Barras (EAN-13)'
+            : 'Escanear Embalagem para Cadastrar'
+        }
+        subtitulo="Aponte a câmera para o QR Code da lata/garrafa ou para as listras do código de barras"
+      />
 
     </div>
   );
