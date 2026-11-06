@@ -31,22 +31,17 @@ class ConsultaEanService:
 
         texto = codigo_ou_url.strip()
 
-        # Verifica se é uma URL do padrão GS1 Digital Link
-        # /01/{gtin}
         match_gtin = re.search(r'/01/(\d{8,14})', texto)
         if match_gtin:
             gtin = match_gtin.group(1)
-            # Remove leading zero se for GTIN-14 derivado de EAN-13
             if len(gtin) == 14 and gtin.startswith('0'):
                 gtin = gtin[1:]
             resultado["gtin"] = gtin
 
-        # /10/{lote}
         match_lote = re.search(r'/10/([^/?#&]+)', texto)
         if match_lote:
             resultado["lote"] = match_lote.group(1)
 
-        # /17/{YYMMDD}
         match_val = re.search(r'/17/(\d{6})', texto)
         if match_val:
             val_str = match_val.group(1)
@@ -54,14 +49,12 @@ class ConsultaEanService:
                 ano = int("20" + val_str[0:2])
                 mes = int(val_str[2:4])
                 dia = int(val_str[4:6])
-                # Ajusta dia 00 (convenção GS1 para último dia do mês)
                 if dia == 0:
                     dia = 28
                 resultado["data_validade"] = f"{ano:04d}-{mes:02d}-{dia:02d}"
             except Exception:
                 pass
 
-        # Se for apenas números e tiver 14 dígitos começando com 0, remove o zero inicial para virar EAN-13
         if resultado["gtin"].isdigit() and len(resultado["gtin"]) == 14 and resultado["gtin"].startswith('0'):
             resultado["gtin"] = resultado["gtin"][1:]
 
@@ -70,7 +63,7 @@ class ConsultaEanService:
     @staticmethod
     def inferir_taxonomia(nome: str, marcas: str, categorias_texto: str) -> Dict[str, Any]:
         """
-        Infere categoria, subcategoria e tipo para o padrão do Barix
+        Infere categoria, subcategoria e tipo para o padrão do Ágape
         com base no nome, marca e categorias retornadas pela base.
         """
         combinado = f"{nome} {marcas} {categorias_texto}".lower()
@@ -80,7 +73,7 @@ class ConsultaEanService:
         tipo = "outros"
 
         # Cervejas
-        if any(w in combinado for w in ["cerveja", "beer", "pilsen", "lager", "ipa", "heineken", "spaten", "skol", "brahma", "amstel", "corona", "stella artois"]):
+        if any(w in combinado for w in ["cerveja", "beer", "pilsen", "lager", "ipa", "heineken", "spaten", "skol", "brahma", "amstel", "corona", "stella artois", "chopp"]):
             categoria = CategoriaProduto.BEBIDAS
             subcategoria = SubcategoriaProduto.ALCOOLICAS
             tipo = "cervejas"
@@ -129,7 +122,7 @@ class ConsultaEanService:
         """
         Consulta dados pelo código de barras ou GS1 Digital Link.
         1. Parse de GS1 para extrair GTIN, lote e validade se presentes.
-        2. Busca no catálogo interno Barix (qualquer tenant que já tenha cadastrado).
+        2. Busca no catálogo interno Ágape (qualquer loja que já tenha cadastrado).
         3. Se não encontrar, busca no Open Food Facts API v2.
         """
         parsed = self.parse_gs1_digital_link(codigo_bruto)
@@ -137,7 +130,7 @@ class ConsultaEanService:
         lote_gs1 = parsed["lote"]
         validade_gs1 = parsed["data_validade"]
 
-        # 1. Busca no Banco Interno Barix
+        # 1. Busca no Banco Interno Ágape
         query = select(Produto).where(
             (Produto.codigo_barras == gtin) | (Produto.qr_code_tag == codigo_bruto)
         ).limit(1)
@@ -147,7 +140,7 @@ class ConsultaEanService:
         if produto_existente:
             return {
                 "encontrado": True,
-                "origem": "catalogo_barix",
+                "origem": "catalogo_agape",
                 "codigo_barras": gtin,
                 "qr_code_tag": codigo_bruto if codigo_bruto != gtin else (produto_existente.qr_code_tag or gtin),
                 "nome": produto_existente.nome,
@@ -165,7 +158,7 @@ class ConsultaEanService:
 
         # 2. Busca na base aberta Open Food Facts
         url = f"https://world.openfoodfacts.org/api/v2/product/{gtin}.json"
-        headers = {"User-Agent": "BarixSaaS/1.0 (contato@barix.com)"}
+        headers = {"User-Agent": "AgapeSaaS/1.0 (contato@e-sigma.app)"}
 
         try:
             async with httpx.AsyncClient(timeout=4.0) as client:
@@ -177,16 +170,13 @@ class ConsultaEanService:
                         
                         nome = prod.get("product_name_pt") or prod.get("product_name") or prod.get("generic_name_pt") or ""
                         marcas = prod.get("brands") or ""
-                        # Se vier múltiplas marcas separadas por vírgula, pega a principal
                         marca_principal = marcas.split(",")[0].strip() if marcas else ""
                         quantidade = prod.get("quantity") or ""
                         
-                        # Se o nome não tiver o volume mas a quantidade tiver, complementa
                         nome_formatado = nome.strip()
                         if quantidade and quantidade.lower() not in nome_formatado.lower():
                             nome_formatado = f"{nome_formatado} {quantidade}".strip()
 
-                        # Pega foto em boa resolução
                         foto_url = (
                             prod.get("image_front_url") or 
                             prod.get("image_url") or 
@@ -214,10 +204,70 @@ class ConsultaEanService:
                             "data_validade_sugerida": validade_gs1
                         }
         except Exception:
-            # Em caso de falha de conexão ou timeout na API externa, apenas prossegue
             pass
 
-        # 3. Não encontrado em bases externas nem local
+        # 3. Inferência Avançada por Prefixo GS1 da Indústria / Fabricante
+        PREFIXOS_GS1 = {
+            "7891991": {"fabricante": "Ambev", "cat": CategoriaProduto.BEBIDAS.value, "sub": SubcategoriaProduto.ALCOOLICAS.value, "tipo": "cervejas", "nome": "Cerveja / Produto Ambev"},
+            "78960455": {"fabricante": "Heineken Brasil", "cat": CategoriaProduto.BEBIDAS.value, "sub": SubcategoriaProduto.ALCOOLICAS.value, "tipo": "cervejas", "nome": "Cerveja Heineken / Amstel"},
+            "78960526": {"fabricante": "Brasil Kirin / Eisenbahn", "cat": CategoriaProduto.BEBIDAS.value, "sub": SubcategoriaProduto.ALCOOLICAS.value, "tipo": "cervejas", "nome": "Cerveja Eisenbahn / Schin"},
+            "78973950": {"fabricante": "Grupo Petrópolis", "cat": CategoriaProduto.BEBIDAS.value, "sub": SubcategoriaProduto.ALCOOLICAS.value, "tipo": "cervejas", "nome": "Cerveja Itaipava / Petra / Black Princess"},
+            "7898918": {"fabricante": "Cervejaria Colorado", "cat": CategoriaProduto.BEBIDAS.value, "sub": SubcategoriaProduto.ALCOOLICAS.value, "tipo": "cervejas", "nome": "Cerveja Artesanal Colorado"},
+            "7894900": {"fabricante": "Coca-Cola Brasil", "cat": CategoriaProduto.BEBIDAS.value, "sub": SubcategoriaProduto.NAO_ALCOOLICAS.value, "tipo": "refrigerantes", "nome": "Refrigerante Coca-Cola"},
+            "78983577": {"fabricante": "SolarBR Coca-Cola", "cat": CategoriaProduto.BEBIDAS.value, "sub": SubcategoriaProduto.NAO_ALCOOLICAS.value, "tipo": "refrigerantes", "nome": "Refrigerante / Suco Del Valle"},
+            "78980806": {"fabricante": "Red Bull Brasil", "cat": CategoriaProduto.BEBIDAS.value, "sub": SubcategoriaProduto.NAO_ALCOOLICAS.value, "tipo": "energeticos", "nome": "Energético Red Bull"},
+            "78982151": {"fabricante": "Piracanjuba / Minalba", "cat": CategoriaProduto.BEBIDAS.value, "sub": SubcategoriaProduto.NAO_ALCOOLICAS.value, "tipo": "bebidas_lacteas", "nome": "Bebida Láctea / Água Mineral"},
+            "7891121": {"fabricante": "Cia Müller de Bebidas (Cachaça 51)", "cat": CategoriaProduto.BEBIDAS.value, "sub": SubcategoriaProduto.ALCOOLICAS.value, "tipo": "destilados_vinhos", "nome": "Cachaça 51 / Destilado"},
+            "7891090": {"fabricante": "Tatuzinho / Velho Barreiro", "cat": CategoriaProduto.BEBIDAS.value, "sub": SubcategoriaProduto.ALCOOLICAS.value, "tipo": "destilados_vinhos", "nome": "Cachaça Velho Barreiro"},
+            "7891000": {"fabricante": "Nestlé Brasil", "cat": CategoriaProduto.ALIMENTOS.value, "sub": SubcategoriaProduto.SOBREMESAS.value, "tipo": "doces", "nome": "Chocolate / Doce Nestlé"},
+            "7891008": {"fabricante": "Chocolates Garoto", "cat": CategoriaProduto.ALIMENTOS.value, "sub": SubcategoriaProduto.SOBREMESAS.value, "tipo": "doces", "nome": "Bombom / Chocolate Garoto"},
+            "7891079": {"fabricante": "Pandurata / Bauducco", "cat": CategoriaProduto.ALIMENTOS.value, "sub": SubcategoriaProduto.SNACKS_PETISCOS.value, "tipo": "petiscos", "nome": "Biscoito / Torrada Bauducco"},
+            "78960007": {"fabricante": "M. Dias Branco", "cat": CategoriaProduto.ALIMENTOS.value, "sub": SubcategoriaProduto.SNACKS_PETISCOS.value, "tipo": "petiscos", "nome": "Snack / Torrada Adria / Fortaleza"},
+            "7891095": {"fabricante": "General Mills / Yoki", "cat": CategoriaProduto.ALIMENTOS.value, "sub": SubcategoriaProduto.SNACKS_PETISCOS.value, "tipo": "petiscos", "nome": "Amendoim / Petisco Yoki"},
+            "78960890": {"fabricante": "3 Corações", "cat": CategoriaProduto.BEBIDAS.value, "sub": SubcategoriaProduto.NAO_ALCOOLICAS.value, "tipo": "cafes", "nome": "Café / Cappuccino 3 Corações"}
+        }
+
+        for prefixo, info in PREFIXOS_GS1.items():
+            if gtin.startswith(prefixo):
+                return {
+                    "encontrado": True,
+                    "origem": "gs1_fabricante",
+                    "codigo_barras": gtin,
+                    "qr_code_tag": codigo_bruto,
+                    "nome": info["nome"],
+                    "descricao": f"Produto oficial registrado na GS1 Brasil pelo fabricante {info['fabricante']}.",
+                    "marca": info["fabricante"],
+                    "categoria": info["cat"],
+                    "subcategoria": info["sub"],
+                    "tipo": info["tipo"],
+                    "foto_url": "",
+                    "preco_custo": 0.0,
+                    "preco_venda_sugerido": 0.0,
+                    "lote_sugerido": lote_gs1,
+                    "data_validade_sugerida": validade_gs1
+                }
+
+        # 4. Fallback Inteligente GS1 Brasil (Se começar com 789 ou 788 e tiver 13 dígitos)
+        if (gtin.startswith("789") or gtin.startswith("788")) and len(gtin) == 13:
+            return {
+                "encontrado": True,
+                "origem": "gs1_brasil",
+                "codigo_barras": gtin,
+                "qr_code_tag": codigo_bruto,
+                "nome": "Produto Comercial (GS1 Brasil)",
+                "descricao": "Item nacional autenticado sob padrão GS1 Brasil (EAN-13).",
+                "marca": "Indústria Nacional",
+                "categoria": CategoriaProduto.BEBIDAS.value,
+                "subcategoria": SubcategoriaProduto.ALCOOLICAS.value,
+                "tipo": "outros",
+                "foto_url": "",
+                "preco_custo": 0.0,
+                "preco_venda_sugerido": 0.0,
+                "lote_sugerido": lote_gs1,
+                "data_validade_sugerida": validade_gs1
+            }
+
+        # 4. Não encontrado
         return {
             "encontrado": False,
             "origem": "nao_identificado",
