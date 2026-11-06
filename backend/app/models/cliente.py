@@ -5,14 +5,43 @@ import enum
 from app.core.database import Base
 
 class Cliente(Base):
-    __tablename__ = "clientes"
-    # Identidade Global do Cliente no Ecossistema BipFy
+    """
+    Consumidor no Salão de Ágapes (agape.e-sigma.app).
+    Unifica:
+    1. Irmãos do Quadro (sincronizados automaticamente da tabela 'obreiros' por CIM ou CPF)
+    2. Irmãos Visitantes (sincronizados automaticamente da tabela 'visitantes' por CIM ou CPF)
+    3. Familiares de Maçons (sincronizados de 'familiares' ou cadastrados no Ágape)
+    4. Convidados Não Maçons (sessões brancas / eventos beneficentes)
+    
+    Garante que o operador do balcão veja apenas dados de consumo (nome, tipo, saldo),
+    protegendo os dados ritualísticos da tabela 'obreiros'.
+    """
+    __tablename__ = "agape_clientes"
+
     id = Column(Integer, primary_key=True, index=True)
-    cpf = Column(String(14), unique=True, nullable=False, index=True) # CPF como chave global
+    cpf = Column(String(20), unique=True, nullable=False, index=True) # CPF ou chave "CIM:{cim}" quando CPF não informado
+    cim = Column(String(30), unique=True, nullable=True, index=True)  # CIM Maçônico para reconhecimento imediato
     
     nome = Column(String(100), nullable=False)
     telefone = Column(String(20), nullable=True)
     email = Column(String(100), nullable=True)
+    
+    # Classificação no Ágape: 'IRMAO_QUADRO', 'IRMAO_VISITANTE', 'FAMILIAR', 'CONVIDADO_NAO_MACOM'
+    tipo_consumidor = Column(String(30), default="IRMAO_QUADRO", nullable=False, index=True)
+    
+    # Vínculos de origem com as tabelas existentes do lojas_db (sem expor dados maçônicos ao garçom)
+    obreiro_esigma_id = Column(Integer, nullable=True, index=True)      # obreiros.id
+    visitante_esigma_id = Column(Integer, nullable=True, index=True)    # visitantes.id
+    familiar_esigma_id = Column(Integer, nullable=True, index=True)     # familiares.id
+    obreiro_responsavel_id = Column(Integer, nullable=True, index=True) # Irmão anfitrião (para familiares/convidados)
+    nome_loja_origem = Column(String(120), nullable=True)               # Ex: Loja de origem do visitante
+
+    # Validação e Dados Oficiais MetaGOB (e-GOB Card)
+    grau_maconico = Column(String(50), nullable=True)                   # Ex: Mestre Maçom
+    situacao_gob = Column(String(50), nullable=True)                    # Ex: REGULAR, ATIVO
+    validado_metagob = Column(Boolean, default=False)                   # True se conferido via PIN oficial
+    data_validacao_metagob = Column(DateTime, nullable=True)
+
     observacao = Column(String(255), nullable=True)
     data_cadastro = Column(DateTime, default=datetime.utcnow)
     ativo = Column(Boolean, default=True)
@@ -23,14 +52,15 @@ class Cliente(Base):
     vinculos_cartoes = relationship("VinculoCartaoCliente", back_populates="cliente")
 
 class CarteiraCliente(Base):
-    """Saldo financeiro isolado por Bar"""
-    __tablename__ = "carteiras_clientes"
+    """Saldo financeiro isolado por Loja (Salão de Ágapes)"""
+    __tablename__ = "agape_carteiras_clientes"
 
     id = Column(Integer, primary_key=True, index=True)
-    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
-    tenant_id = Column(Integer, ForeignKey("estabelecimentos.id"), nullable=False, index=True)
+    cliente_id = Column(Integer, ForeignKey("agape_clientes.id"), nullable=False, index=True)
+    tenant_id = Column(Integer, ForeignKey("agape_estabelecimentos.id"), nullable=False, index=True)
     
     saldo = Column(Float, default=0.0, nullable=False)
+    limite_fiado = Column(Float, default=100.0, nullable=False) # Trava de limite devedor máximo (R$ 100,00)
     data_atualizacao = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     cliente = relationship("Cliente", back_populates="carteiras")
@@ -40,15 +70,18 @@ class CarteiraCliente(Base):
 class TipoTransacaoCarteira(str, enum.Enum):
     CREDITO_PIX = "credito_pix"
     CREDITO_BALCAO = "credito_balcao"
+    RECARGA_BOLETO = "recarga_boleto"
+    RECARGA_DINHEIRO = "recarga_dinheiro"
+    RECARGA_CARTAO = "recarga_cartao"
     DEBITO_PEDIDO = "debito_pedido"
     ESTORNO = "estorno"
 
 class TransacaoCarteira(Base):
-    """Ledger Imutável (Event Sourcing) para auditar cada centavo do cliente."""
-    __tablename__ = "transacoes_carteira"
+    """Ledger Imutável (Event Sourcing) para auditar cada centavo no Ágape."""
+    __tablename__ = "agape_transacoes_carteira"
 
     id = Column(Integer, primary_key=True, index=True)
-    carteira_id = Column(Integer, ForeignKey("carteiras_clientes.id"), nullable=False, index=True)
+    carteira_id = Column(Integer, ForeignKey("agape_carteiras_clientes.id"), nullable=False, index=True)
     
     tipo = Column(Enum(TipoTransacaoCarteira), nullable=False)
     valor = Column(Float, nullable=False)
@@ -60,14 +93,14 @@ class TransacaoCarteira(Base):
     carteira = relationship("CarteiraCliente", back_populates="transacoes")
 
 class CartaoCliente(Base):
-    """Cartões Físicos (RFID) ou Identificadores Virtuais vinculados ao cliente em um bar específico"""
-    __tablename__ = "cartoes_clientes"
+    """Cartões Físicos (RFID) ou Identificadores Virtuais vinculados ao consumidor em uma Loja"""
+    __tablename__ = "agape_cartoes_clientes"
 
     id = Column(Integer, primary_key=True, index=True)
     rfid_uuid = Column(String(100), unique=True, nullable=False, index=True)
     
-    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
-    tenant_id = Column(Integer, ForeignKey("estabelecimentos.id"), nullable=False, index=True)
+    cliente_id = Column(Integer, ForeignKey("agape_clientes.id"), nullable=False, index=True)
+    tenant_id = Column(Integer, ForeignKey("agape_estabelecimentos.id"), nullable=False, index=True)
     
     ativo = Column(Boolean, default=True)
     data_emissao = Column(DateTime, default=datetime.utcnow)
@@ -76,30 +109,23 @@ class CartaoCliente(Base):
     estabelecimento = relationship("Estabelecimento")
 
 
-# ==============================================================
-# GESTÃO DE CARTÕES FÍSICOS (CORINGA / DEVOLVÍVEL & AUDITORIA)
-# ==============================================================
-
 class StatusCartaoFisico(str, enum.Enum):
-    DISPONIVEL = "disponivel"      # No gaveteiro do caixa, pronto para novo cliente
-    EM_USO = "em_uso"              # Na mão de um cliente consumindo no bar
-    EXTRAVIADO = "extraviado"      # Cliente foi embora e não devolveu
+    DISPONIVEL = "disponivel"
+    EM_USO = "em_uso"
+    EXTRAVIADO = "extraviado"
     BLOQUEADO = "bloqueado"
 
 class TipoCartaoFisico(str, enum.Enum):
-    CORINGA_TEMPORARIO = "coringa_temporario"  # Cartão genérico devolvido no fim do dia
+    CORINGA_TEMPORARIO = "coringa_temporario"
     PERSONALIZADO_MEMBRO = "personalizado_membro"
 
 class CartaoFisico(Base):
-    """
-    Representa o cartão físico em si (o plástico com QR Code impresso ou chip RFID).
-    Pode ser reutilizado infinitas vezes por clientes diferentes ao longo dos dias.
-    """
-    __tablename__ = "cartoes_fisicos"
+    """Cartão físico reutilizável (Coringa) da Loja para visitantes/convidados ou membros."""
+    __tablename__ = "agape_cartoes_fisicos"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("estabelecimentos.id"), nullable=False, index=True)
-    codigo_identificador = Column(String(100), unique=True, nullable=False, index=True) # Ex: "BIPFY-CARD-042" ou RFID UUID
+    tenant_id = Column(Integer, ForeignKey("agape_estabelecimentos.id"), nullable=False, index=True)
+    codigo_identificador = Column(String(100), unique=True, nullable=False, index=True) # Ex: "AGAPE-CARD-042"
     
     tipo = Column(Enum(TipoCartaoFisico), default=TipoCartaoFisico.CORINGA_TEMPORARIO, nullable=False)
     status = Column(Enum(StatusCartaoFisico), default=StatusCartaoFisico.DISPONIVEL, nullable=False, index=True)
@@ -110,22 +136,18 @@ class CartaoFisico(Base):
 
 
 class VinculoCartaoCliente(Base):
-    """
-    Histórico perpétuo de custódia do cartão.
-    Quando o cliente devolve o cartão no fim do dia, este vínculo é encerrado (ativo = False),
-    mas o registro permanece para sempre para fins de auditoria forense/câmeras.
-    """
-    __tablename__ = "vinculos_cartoes_clientes"
+    """Histórico perpétuo de custódia do cartão no Salão de Ágapes."""
+    __tablename__ = "agape_vinculos_cartoes_clientes"
 
     id = Column(Integer, primary_key=True, index=True)
-    cartao_id = Column(Integer, ForeignKey("cartoes_fisicos.id"), nullable=False, index=True)
-    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
-    tenant_id = Column(Integer, ForeignKey("estabelecimentos.id"), nullable=False, index=True)
-    comanda_id = Column(Integer, ForeignKey("comandas.id"), nullable=True, index=True)
+    cartao_id = Column(Integer, ForeignKey("agape_cartoes_fisicos.id"), nullable=False, index=True)
+    cliente_id = Column(Integer, ForeignKey("agape_clientes.id"), nullable=False, index=True)
+    tenant_id = Column(Integer, ForeignKey("agape_estabelecimentos.id"), nullable=False, index=True)
+    comanda_id = Column(Integer, ForeignKey("agape_comandas.id"), nullable=True, index=True)
     
     data_vinculo = Column(DateTime, default=datetime.utcnow, nullable=False)
-    data_desvinculo = Column(DateTime, nullable=True) # Preenchido quando o cliente devolve o cartão
-    ativo = Column(Boolean, default=True, index=True) # True enquanto o cliente estiver no bar com o cartão
+    data_desvinculo = Column(DateTime, nullable=True)
+    ativo = Column(Boolean, default=True, index=True)
     
     observacao = Column(String(255), nullable=True)
 
