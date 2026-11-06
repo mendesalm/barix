@@ -151,6 +151,21 @@ export function ComandaMenuScreen({ route, navigation }: Props) {
             const qtd = carrinho[item.id] || 0;
             return (
               <View style={styles.card}>
+                {/* Imagem do Produto Cadastrado */}
+                <View style={styles.imgContainer}>
+                  {item.foto_url ? (
+                    <Image 
+                      source={{ uri: item.foto_url }} 
+                      style={styles.prodImg} 
+                      resizeMode="contain" 
+                    />
+                  ) : (
+                    <View style={styles.prodImgPlaceholder}>
+                      <Package color="#64748b" size={24} />
+                    </View>
+                  )}
+                </View>
+
                 <View style={styles.cardDetails}>
                   <Text style={styles.prodNome}>{item.nome}</Text>
                   {item.marca ? (
@@ -228,12 +243,15 @@ const styles = StyleSheet.create({
   chipText: { color: '#888', fontSize: 12, fontWeight: '600' },
   chipTextAtivo: { color: '#fff' },
   list: { padding: 20, paddingBottom: 100 },
-  card: { backgroundColor: '#14141e', borderRadius: 16, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#222' },
+  card: { backgroundColor: '#14141e', borderRadius: 16, padding: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#222' },
+  imgContainer: { width: 56, height: 56, borderRadius: 12, backgroundColor: '#1c1c2a', justifyContent: 'center', alignItems: 'center', marginRight: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#2d2d3f' },
+  prodImg: { width: '100%', height: '100%' },
+  prodImgPlaceholder: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
   cardDetails: { flex: 1 },
-  prodNome: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  prodMarca: { color: '#94a3b8', fontSize: 12, marginTop: 2 },
-  prodPreco: { color: '#3b82f6', fontSize: 16, fontWeight: 'black', marginTop: 6 },
-  prodEstoque: { color: '#64748b', fontSize: 11, marginTop: 2 },
+  prodNome: { color: '#fff', fontSize: 15, fontWeight: 'bold', fontFamily: 'sans-serif' },
+  prodMarca: { color: '#94a3b8', fontSize: 11, marginTop: 2, fontFamily: 'sans-serif' },
+  prodPreco: { color: '#38bdf8', fontSize: 15, fontWeight: 'bold', marginTop: 4, fontFamily: 'sans-serif' },
+  prodEstoque: { color: '#64748b', fontSize: 10, marginTop: 2, fontFamily: 'sans-serif' },
   qtdContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 12 },
   qtdBtnPlus: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#3b82f6', justifyContent: 'center', alignItems: 'center' },
   qtdBtnMinus: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#334155', justifyContent: 'center', alignItems: 'center' },

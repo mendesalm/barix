@@ -14,13 +14,15 @@ import {
   ArrowRight,
   UserCheck,
   UserPlus,
-  RotateCcw
+  RotateCcw,
+  Package
 } from 'lucide-react';
 
 interface ItemComanda {
   id: number;
   produto_id: number;
   produto_nome?: string;
+  produto_foto_url?: string;
   quantidade: number;
   valor_unitario: number;
   status?: string;
@@ -45,6 +47,7 @@ interface Produto {
   codigo_barras?: string;
   qr_code_tag?: string;
   marca?: string;
+  foto_url?: string;
 }
 
 export function Comandas() {
@@ -284,9 +287,18 @@ export function Comandas() {
     }
   };
 
+  const getProduto = (id: number) => {
+    return produtos.find(p => p.id === id);
+  };
+
   const getProdutoNome = (id: number) => {
-    const prod = produtos.find(p => p.id === id);
+    const prod = getProduto(id);
     return prod ? prod.nome : `Produto #${id}`;
+  };
+
+  const getProdutoFoto = (id: number) => {
+    const prod = getProduto(id);
+    return prod?.foto_url || null;
   };
 
   return (
@@ -443,17 +455,30 @@ export function Comandas() {
               {/* Card de Conferência na Frente do Cliente */}
               {produtoConferencia ? (
                 <div className="p-5 bg-blue-50/70 border-2 border-blue-400 rounded-2xl space-y-4 animate-fadeIn">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-100 px-2 py-0.5 rounded-full">
-                        Conferir com o Cliente
-                      </span>
-                      <h3 className="text-2xl font-black text-gray-900 mt-1">{produtoConferencia.nome}</h3>
-                      <p className="text-xs text-gray-500">{produtoConferencia.marca ? `Marca: ${produtoConferencia.marca} • ` : ''}Preço Unitário: R$ {produtoConferencia.preco_venda.toFixed(2)}</p>
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex items-center gap-3.5">
+                      {produtoConferencia.foto_url ? (
+                        <img 
+                          src={produtoConferencia.foto_url} 
+                          alt={produtoConferencia.nome} 
+                          className="w-16 h-16 object-contain rounded-xl bg-white border border-blue-200 p-1 shadow-xs shrink-0" 
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                          <Package size={28} />
+                        </div>
+                      )}
+                      <div>
+                        <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-100 px-2 py-0.5 rounded-full">
+                          Conferir com o Cliente
+                        </span>
+                        <h3 className="text-xl font-black text-gray-900 mt-1">{produtoConferencia.nome}</h3>
+                        <p className="text-xs text-gray-500">{produtoConferencia.marca ? `Marca: ${produtoConferencia.marca} • ` : ''}Preço Unitário: R$ {produtoConferencia.preco_venda.toFixed(2)}</p>
+                      </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <span className="text-xs text-gray-500">Subtotal</span>
-                      <div className="text-3xl font-extrabold text-blue-700">
+                      <div className="text-2xl font-extrabold text-blue-700">
                         R$ {(produtoConferencia.preco_venda * qtdConferencia).toFixed(2)}
                       </div>
                     </div>
@@ -539,17 +564,29 @@ export function Comandas() {
                   <p className="text-xs text-gray-400">Bipe produtos para registrar os consumos.</p>
                 </div>
               ) : (
-                comandaBalcaoAtiva.itens.map((item, idx) => (
-                  <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl border border-gray-100">
-                    <div>
-                      <div className="font-bold text-gray-800 text-sm">{item.quantidade}x {item.produto_nome || getProdutoNome(item.produto_id)}</div>
-                      <div className="text-[11px] text-gray-400">R$ {item.valor_unitario.toFixed(2)} cada</div>
+                comandaBalcaoAtiva.itens.map((item, idx) => {
+                  const foto = item.produto_foto_url || getProdutoFoto(item.produto_id);
+                  return (
+                    <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="flex items-center gap-3">
+                        {foto ? (
+                          <img src={foto} alt="" className="w-10 h-10 object-contain rounded-lg bg-white border border-gray-200 p-0.5 shrink-0" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center text-gray-400 shrink-0">
+                            <Package size={18} />
+                          </div>
+                        )}
+                        <div>
+                          <div className="font-bold text-gray-800 text-sm">{item.quantidade}x {item.produto_nome || getProdutoNome(item.produto_id)}</div>
+                          <div className="text-[11px] text-gray-400">R$ {item.valor_unitario.toFixed(2)} cada</div>
+                        </div>
+                      </div>
+                      <div className="font-black text-gray-900 text-sm">
+                        R$ {(item.quantidade * item.valor_unitario).toFixed(2)}
+                      </div>
                     </div>
-                    <div className="font-black text-gray-900 text-sm">
-                      R$ {(item.quantidade * item.valor_unitario).toFixed(2)}
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
@@ -669,14 +706,28 @@ export function Comandas() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {comandaSelecionada.itens.map((it, i) => (
-                        <tr key={i}>
-                          <td className="p-3 font-bold">{it.quantidade}x</td>
-                          <td className="p-3">{it.produto_nome || getProdutoNome(it.produto_id)}</td>
-                          <td className="p-3 text-right text-gray-500">R$ {it.valor_unitario.toFixed(2)}</td>
-                          <td className="p-3 text-right font-bold text-gray-900">R$ {(it.quantidade * it.valor_unitario).toFixed(2)}</td>
-                        </tr>
-                      ))}
+                      {comandaSelecionada.itens.map((it, i) => {
+                        const foto = it.produto_foto_url || getProdutoFoto(it.produto_id);
+                        return (
+                          <tr key={i}>
+                            <td className="p-3 font-bold">{it.quantidade}x</td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-2">
+                                {foto ? (
+                                  <img src={foto} alt="" className="w-8 h-8 object-contain rounded bg-white border border-gray-200 p-0.5 shrink-0" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center text-gray-400 shrink-0">
+                                    <Package size={14} />
+                                  </div>
+                                )}
+                                <span className="font-medium text-gray-800">{it.produto_nome || getProdutoNome(it.produto_id)}</span>
+                              </div>
+                            </td>
+                            <td className="p-3 text-right text-gray-500">R$ {it.valor_unitario.toFixed(2)}</td>
+                            <td className="p-3 text-right font-bold text-gray-900">R$ {(it.quantidade * it.valor_unitario).toFixed(2)}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
