@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, ClipboardList, DollarSign, LogOut, Settings, Menu, X, Wine, ShieldCheck, Building2 } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, LogOut, Settings, Menu, X, Wine, ShieldCheck, Building2 } from 'lucide-react';
 
 export function Layout() {
   const navigate = useNavigate();
@@ -19,12 +19,12 @@ export function Layout() {
   };
 
   const baseMenuItems = [
-    { to: '/app', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-    { to: '/app/produtos', icon: <Package size={20} />, label: 'Produtos e Estoque' },
-    { to: '/app/comandas', icon: <ClipboardList size={20} />, label: 'Comandas' },
+    { to: '/app', icon: <LayoutDashboard size={20} />, label: 'Hub Inicial' },
+    { to: '/app/gerencia', icon: <ShieldCheck size={20} />, label: 'Gerente: Painel' },
+    { to: '/app/comandas', icon: <ClipboardList size={20} />, label: 'Operador: PDV' },
+    { to: '/app/cliente', icon: <Wine size={20} />, label: 'Portal do Cliente' },
+    { to: '/app/auditoria', icon: <Settings size={20} />, label: 'Auditoria' },
     ...(isSuperAdmin ? [{ to: '/app/instancias', icon: <Building2 size={20} />, label: 'Instâncias (SaaS)' }] : []),
-    { to: '/app/financeiro', icon: <DollarSign size={20} />, label: 'Financeiro' },
-    { to: '/app/auditoria', icon: <ShieldCheck size={20} />, label: 'Auditoria' },
   ];
 
   return (
