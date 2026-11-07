@@ -30,6 +30,6 @@ class Configuracoes(BaseSettings):
     METAGOB_CLIENT_SECRET: Optional[str] = None
     METAGOB_SANDBOX_MODE: bool = True
 
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+    model_config = SettingsConfigDict(env_file=["backend/.env", ".env"], case_sensitive=True, extra="ignore")
 
 config = Configuracoes()

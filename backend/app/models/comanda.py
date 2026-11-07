@@ -14,7 +14,7 @@ class Comanda(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(Integer, ForeignKey("estabelecimentos.id"), nullable=False, index=True)
-    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("agape_clientes.id"), nullable=True, index=True)
     nome_cliente = Column(String(100), nullable=True) # Mantido para comandas anônimas (sem conta)
     identificador_cartao = Column(String(50), index=True, nullable=True) # Ex: Número do QR Code (removido unique=True global, unique deve ser por tenant)
     status = Column(Enum(StatusComanda), default=StatusComanda.ABERTA, nullable=False)
