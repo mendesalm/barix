@@ -12,6 +12,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Landing } from './pages/Landing';
 import { Auditoria } from './pages/Auditoria';
 import { Instancias } from './pages/Instancias';
+import { CatalogoGlobalAdmin } from './pages/CatalogoGlobalAdmin';
 
 // Rota protegida básica
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
@@ -52,6 +53,8 @@ export default function App() {
           <Route path="portal-cliente" element={<PortalCliente />} />
           <Route path="auditoria" element={<Auditoria />} />
           <Route path="instancias" element={<Instancias />} />
+          <Route path="catalogo-global" element={<CatalogoGlobalAdmin />} />
+          <Route path="catalogo-mestre" element={<CatalogoGlobalAdmin />} />
           <Route path="dashboard" element={<Dashboard />} />
         </Route>
       </Routes>

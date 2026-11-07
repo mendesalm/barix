@@ -22,6 +22,7 @@ from app.api.routers.kds_router import router as kds_router
 from app.api.routers.checkout_router import router as checkout_router
 from app.api.routers.cartao_router import router as cartao_router
 from app.api.routers.metagob_router import router as metagob_router
+from app.api.routers.catalogo_mestre_router import router as catalogo_mestre_router
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -82,6 +83,7 @@ app.include_router(kds_router)
 app.include_router(checkout_router)
 app.include_router(cartao_router)
 app.include_router(metagob_router)
+app.include_router(catalogo_mestre_router)
 
 @app.get("/", tags=["Healthcheck"])
 async def root():
