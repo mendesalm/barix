@@ -1,18 +1,26 @@
 from datetime import datetime, timedelta
 from typing import Optional
-from passlib.context import CryptContext
+import bcrypt
 import jwt
 from app.core.config import config
 from app.core.exceptions import RegraNegocioException
 
-# Configuração do bcrypt para hash de senhas
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 def obter_hash_senha(senha: str) -> str:
-    return pwd_context.hash(senha)
+    """Gera hash seguro com salt usando bcrypt nativo de alta performance."""
+    senha_bytes = senha.encode("utf-8")[:72]
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(senha_bytes, salt).decode("utf-8")
 
 def verificar_senha(senha_plana: str, senha_hash: str) -> bool:
-    return pwd_context.verify(senha_plana, senha_hash)
+    """Verifica senha com bcrypt nativo sem os erros de compatibilidade do passlib."""
+    if not senha_plana or not senha_hash:
+        return False
+    try:
+        senha_bytes = senha_plana.encode("utf-8")[:72]
+        hash_bytes = senha_hash.encode("utf-8")
+        return bcrypt.checkpw(senha_bytes, hash_bytes)
+    except Exception:
+        return False
 
 def criar_token_acesso(dados: dict, expira_em_delta: Optional[timedelta] = None) -> str:
     dados_para_codificar = dados.copy()
