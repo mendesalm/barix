@@ -1,5 +1,6 @@
 import enum
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Enum
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Enum, JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -39,7 +40,8 @@ class Produto(Base):
     ativo = Column(Boolean, default=True)
 
     # Identificadores de Bipagem e Automação
-    codigo_barras = Column(String(50), nullable=True, index=True) # EAN-13 / GTIN de fábrica
+    codigo_barras = Column(String(50), nullable=True, index=True) # EAN-13 / GTIN principal de fábrica
+    codigos_barras_alternativos = Column(JSON().with_variant(JSONB, "postgresql"), default=list, nullable=False) # EANs/GTINs/DUN-14 adicionais
     qr_code_tag = Column(String(500), nullable=True, index=True)  # QR Code de fábrica do produto (lata/garrafa) ou tag
 
     # Níveis de estoque mínimo configuráveis por bar (Gatilho de reposição e compra)
