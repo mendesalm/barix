@@ -1,0 +1,45 @@
+name: AutoDeploy VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy na VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -e
+            APP_DIR="${{ secrets.VPS_APP_DIR }}"
+            cd "$APP_DIR"
+
+            git fetch origin main
+            git reset --hard origin/main
+
+            if [ -d "frontend" ]; then
+              cd "$APP_DIR/frontend"
+              npm ci
+              npm run build
+            fi
+
+            if [ -d "$APP_DIR/backend/venv" ]; then
+              "$APP_DIR/backend/venv/bin/pip" install -r "$APP_DIR/backend/requirements.txt"
+            fi
+
+            if [ -n "${{ secrets.VPS_RESTART_CMD }}" ]; then
+              eval "${{ secrets.VPS_RESTART_CMD }}"
+            elif [ -f "$APP_DIR/docker-compose.yml" ]; then
+              cd "$APP_DIR"
+              docker compose up -d --build
+            else
+              echo "Defina o secret VPS_RESTART_CMD se o backend usar systemd/pm2/supervisor."
+            fi
